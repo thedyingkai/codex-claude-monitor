@@ -35,13 +35,18 @@ set base_url https://monitor.example.com
 set token qmon_REPLACE_WITH_DISPLAY_TOKEN
 set timezone CST-8
 set refresh_seconds 15
+set brightness_percent 60
+set dim_after_seconds 60
+set screen_off_after_seconds 300
+set screen_off_refresh_seconds 60
 save
 test
 ```
 
-屏幕应横向显示两张配额卡。左半屏短按立即刷新、长按显示连接诊断；右半屏短按切换
-30%/60%/100% 亮度、长按显示固件/IP/数据源时间。板上 BOOT 键在程序运行后也可
-短按刷新、长按诊断。RESET 只复位，不是第二个用户键。
+屏幕应横向显示两张配额卡。亮屏时触摸任意位置立即刷新；长按左半屏显示连接诊断，
+长按右半屏显示固件/IP/数据源时间。默认 60 秒降到 10% 亮度、5 分钟关闭背光，
+第一次触摸会立即亮屏并刷新。BOOT 短按刷新，按住 1.2–5 秒显示诊断，持续 5 秒
+打开临时手机配网页。RESET 只复位，不是第二个用户键。
 
 ## 3. 断电核对电池极性
 

@@ -7,8 +7,8 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
     -ldflags "-s -w -X main.version=${VERSION}" \
     -o /out/quota-monitor ./cmd/quota-monitor \
-    && mkdir -p /out/data \
-    && chmod 0700 /out/data
+    && mkdir -p /out/data/firmware \
+    && chmod 0700 /out/data /out/data/firmware
 
 FROM scratch
 COPY --from=build /out/quota-monitor /app/quota-monitor
@@ -18,4 +18,4 @@ VOLUME ["/data"]
 EXPOSE 8787
 USER 65532:65532
 ENTRYPOINT ["/app/quota-monitor"]
-CMD ["server", "--listen=:8787", "--db=/data/monitor.db"]
+CMD ["server", "--listen=:8787", "--db=/data/monitor.db", "--firmware-dir=/data/firmware"]

@@ -6,7 +6,7 @@ services:
       args:
         VERSION: ${MONITOR_VERSION:-dev}
     restart: unless-stopped
-    command: ["server", "--listen=:8787", "--db=/data/monitor.db"]
+    command: ["server", "--listen=:8787", "--db=/data/monitor.db", "--firmware-dir=/data/firmware"]
     volumes:
       - monitor-data:/data
     networks: [backend]

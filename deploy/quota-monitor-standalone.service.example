@@ -13,14 +13,15 @@ Environment="PATH=%h/.local/bin:%h/.local/share/pnpm:%h/.npm-global/bin:/usr/loc
 # reducing overlap but not either CLI's own peak. A 512 MB host remains
 # unsupported, needs swap and continuous memory/OOM monitoring.
 # Use absolute --codex-command/--claude-command paths for nvm/asdf installs.
-ExecStart=%h/.local/bin/quota-monitor standalone --listen=127.0.0.1:8787 --db=%h/.local/share/quota-monitor/monitor.db --display-token-file=%h/.local/share/quota-monitor/display.token --hook-secret-file=%h/.quota-monitor/hook-secret --claude=false --sequential-collection=true --log-format=text
+ExecStart=%h/.local/bin/quota-monitor standalone --listen=127.0.0.1:8787 --db=%h/.local/share/quota-monitor/monitor.db --display-token-file=%h/.local/share/quota-monitor/display.token --hook-secret-file=%h/.quota-monitor/hook-secret --firmware-dir=%h/.local/share/quota-monitor/firmware --claude=false --sequential-collection=true --log-format=text
 Restart=on-failure
 RestartSec=15s
 TimeoutStopSec=20s
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-# Official CLIs must be able to update their per-user credentials and caches.
+ProtectSystem=full
+# Official CLIs and quota-monitor must be able to update per-user credentials,
+# caches, database, token, and firmware files. strict would make HOME read-only.
 ProtectHome=false
 UMask=0077
 

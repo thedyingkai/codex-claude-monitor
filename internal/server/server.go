@@ -11,11 +11,14 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
 
+	"codex-claude-monitor/internal/firmware"
 	"codex-claude-monitor/internal/model"
 	"codex-claude-monitor/internal/store"
 )
@@ -35,6 +38,10 @@ const (
 type Config struct {
 	Store *store.Store
 
+	// FirmwareDir contains a locally published manifest and image. An empty
+	// value leaves the authenticated firmware endpoints available but empty.
+	FirmwareDir string
+
 	// Logger defaults to a discard logger. Request headers and bearer tokens
 	// are never included in log records.
 	Logger *slog.Logger
@@ -49,10 +56,11 @@ type Config struct {
 }
 
 type Server struct {
-	store  *store.Store
-	logger *slog.Logger
-	now    func() time.Time
-	mux    *http.ServeMux
+	store       *store.Store
+	logger      *slog.Logger
+	now         func() time.Time
+	mux         *http.ServeMux
+	firmwareDir string
 
 	limiter             *fixedWindowLimiter
 	agentRateLimit      int
@@ -102,10 +110,13 @@ func New(cfg Config) (*Server, error) {
 		globalAuthRateLimit: cfg.GlobalAuthAttemptsPerMinute,
 		authSlots:           make(chan struct{}, cfg.ConcurrentAuth),
 		mux:                 http.NewServeMux(),
+		firmwareDir:         strings.TrimSpace(cfg.FirmwareDir),
 	}
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 	s.mux.HandleFunc("POST /api/v1/agent/report", s.handleAgentReport)
 	s.mux.HandleFunc("GET /api/v1/display/snapshot", s.handleDisplaySnapshot)
+	s.mux.HandleFunc("GET /api/v1/display/firmware/e32r28t/manifest", s.handleFirmwareManifest)
+	s.mux.HandleFunc("GET /api/v1/display/firmware/e32r28t/{file}", s.handleFirmwareDownload)
 	return s, nil
 }
 
@@ -118,6 +129,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	// Deliberately do not add Access-Control-Allow-* headers. The API is for
 	// agents and the embedded display, not browser origins.
+	// Reject non-canonical paths before ServeMux can generate an automatic
+	// redirect. Embedded clients never need redirects, especially for a
+	// credential-bearing firmware download.
+	if r.URL.Path == "" || path.Clean(r.URL.Path) != r.URL.Path {
+		writeError(w, http.StatusNotFound, "not_found", "endpoint not found")
+		return
+	}
 	s.mux.ServeHTTP(w, r)
 }
 
@@ -202,6 +220,59 @@ func (s *Server) handleDisplaySnapshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, snapshot)
+}
+
+func (s *Server) handleFirmwareManifest(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.authenticate(w, r, store.ScopeDisplayRead, s.displayRateLimit); !ok {
+		return
+	}
+	manifest, err := firmware.LoadManifest(s.firmwareDir)
+	if err != nil {
+		s.writeFirmwareError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, manifest)
+}
+
+func (s *Server) handleFirmwareDownload(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.authenticate(w, r, store.ScopeDisplayRead, s.displayRateLimit); !ok {
+		return
+	}
+	fileName := r.PathValue("file")
+	if !strings.HasSuffix(fileName, ".bin") || strings.Count(fileName, ".bin") != 1 {
+		writeError(w, http.StatusNotFound, "firmware_not_found", "firmware version not found")
+		return
+	}
+	version := strings.TrimSuffix(fileName, ".bin")
+	file, manifest, err := firmware.OpenVerifiedImage(r.Context(), s.firmwareDir, version)
+	if err != nil {
+		s.writeFirmwareError(w, err)
+		return
+	}
+	defer file.Close()
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.FormatInt(manifest.SizeBytes, 10))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, firmware.ImageName(manifest.Board, manifest.Version)))
+	w.WriteHeader(http.StatusOK)
+	if _, err := io.Copy(w, file); err != nil {
+		// The response may already contain a partial image, so only log a
+		// redacted diagnostic. The device validates both length and SHA-256.
+		s.logger.Warn("firmware download interrupted", "version", manifest.Version)
+	}
+}
+
+func (s *Server) writeFirmwareError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, firmware.ErrNotFound):
+		writeError(w, http.StatusNotFound, "firmware_not_found", "firmware version not found")
+	case errors.Is(err, firmware.ErrInvalidManifest), errors.Is(err, firmware.ErrHashMismatch):
+		s.logger.Error("published firmware validation failed")
+		writeError(w, http.StatusServiceUnavailable, "firmware_invalid", "published firmware is unavailable")
+	default:
+		s.logger.Error("published firmware read failed")
+		writeError(w, http.StatusServiceUnavailable, "firmware_unavailable", "published firmware is unavailable")
+	}
 }
 
 func (s *Server) authenticate(w http.ResponseWriter, r *http.Request, scope store.TokenScope, limit int) (store.TokenRecord, bool) {

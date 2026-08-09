@@ -425,8 +425,15 @@ func TestServiceGenerators(t *testing.T) {
 	standalone, err := GenerateSystemdUnit(ServiceFileConfig{
 		Executable: "/home/me/bin/quota-monitor", WorkingDirectory: "/home/me/.quota-monitor", Mode: "standalone",
 	})
-	if err != nil || !strings.Contains(standalone, " standalone\n") || strings.Contains(standalone, "--config") ||
+	if err != nil || !strings.Contains(standalone, ` standalone --firmware-dir="%h/.local/share/quota-monitor/firmware"`) || strings.Contains(standalone, "--config") ||
 		!strings.Contains(standalone, "standalone quota monitor") {
 		t.Fatalf("bad standalone unit: %v %s", err, standalone)
+	}
+	customFirmware, err := GenerateSystemdUnit(ServiceFileConfig{
+		Executable: "/home/me/bin/quota-monitor", Mode: "standalone",
+		FirmwareDirectory: "/home/me/qmon firmware",
+	})
+	if err != nil || !strings.Contains(customFirmware, `--firmware-dir "/home/me/qmon firmware"`) {
+		t.Fatalf("bad standalone firmware directory: %v %s", err, customFirmware)
 	}
 }

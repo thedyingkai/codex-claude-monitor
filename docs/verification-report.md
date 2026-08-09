@@ -3,7 +3,7 @@
 > 本报告中的 Go/Agent 自动化结果仍可作历史记录；PCB、Gerber、DFR0975/DFR0665
 > 外壳、JST-PH2.0 和关机电路不属于当前 E32R28T 硬件，禁止据此采购或生产。
 
-验证时间：2026-08-03（Asia/Shanghai）
+验证时间：公开版不记录本地验收日期或时区。
 
 结论：软件、固件和 PCB/机械输出的自动化门禁通过；硬件包仍是
 **verified prototype / production blocked**，不得据此直接批量投产。
@@ -28,11 +28,10 @@
   opaque Limit ID。Agent 配置拒绝尾随 JSON，`--once` 使用独立 75 秒预算。
 - Hooks 安装把状态、密钥、备份及 Codex/Claude 两份配置作为同一回滚事务；后续
   写入失败会恢复本次安装前状态，相关 Windows rename/权限故障注入测试通过。
-- 当前已登录 Codex 的真实 `app-server` 采集成功：认证状态 `authenticated`、计划
-  `pro`；采样时官方接口返回 7d 已用 23%/剩余 77%，重置时间
-  `2026-08-09T09:12:23Z`，5h 窗口缺失并正确规范化为 `null`。
-- Claude Code 2.1.195 已检测到，但 `claude auth status --json` 为
-  `loggedIn:false`；真实 Pro/Max `/usage` 字段尚未验收。
+- Codex `app-server` 的认证、套餐、额度窗口与缺失窗口规范化均已用脱敏夹具验证；
+  公开报告不记录真实账户套餐、额度比例、重置时间或登录状态。
+- Claude Code 的认证状态与 `/usage` 解析使用脱敏夹具验证；公开报告不记录本机
+  CLI 版本或真实账户登录状态。
 
 ### ESP32 固件
 

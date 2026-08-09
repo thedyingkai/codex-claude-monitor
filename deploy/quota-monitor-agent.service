@@ -11,8 +11,9 @@ Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-# Codex and Claude Code must be able to update their normal per-user stores.
+ProtectSystem=full
+# Codex and Claude Code must be able to update their normal per-user stores;
+# ProtectSystem=strict would also make HOME read-only.
 ProtectHome=false
 UMask=0077
 

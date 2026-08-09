@@ -9,11 +9,12 @@ import (
 )
 
 type ServiceFileConfig struct {
-	Executable       string
-	ConfigPath       string
-	WorkingDirectory string
-	WindowsUserID    string
-	Mode             string
+	Executable        string
+	ConfigPath        string
+	FirmwareDirectory string
+	WorkingDirectory  string
+	WindowsUserID     string
+	Mode              string
 }
 
 func serviceCommand(cfg ServiceFileConfig) (string, string, error) {
@@ -47,6 +48,8 @@ func GenerateWindowsTaskXML(cfg ServiceFileConfig) (string, error) {
 	}
 	if strings.HasPrefix(arguments, "agent --config ") {
 		arguments = `agent --config &quot;` + html.EscapeString(cfg.ConfigPath) + `&quot;`
+	} else if strings.EqualFold(strings.TrimSpace(cfg.Mode), "standalone") && cfg.FirmwareDirectory != "" {
+		arguments += ` --firmware-dir &quot;` + html.EscapeString(cfg.FirmwareDirectory) + `&quot;`
 	}
 	working := cfg.WorkingDirectory
 	if working == "" {
@@ -95,6 +98,15 @@ func GenerateSystemdUnit(cfg ServiceFileConfig) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if strings.EqualFold(strings.TrimSpace(cfg.Mode), "standalone") {
+		if cfg.FirmwareDirectory == "" {
+			// This is a user unit. Keep firmware alongside the user's other
+			// quota-monitor state instead of falling back to root-owned /var/lib.
+			arguments += ` --firmware-dir="%h/.local/share/quota-monitor/firmware"`
+		} else {
+			arguments += " --firmware-dir " + systemdEscape(cfg.FirmwareDirectory)
+		}
+	}
 	working := cfg.WorkingDirectory
 	if working == "" {
 		// Units always use POSIX paths, even when generated on Windows.
@@ -121,9 +133,11 @@ Restart=on-failure
 RestartSec=15s
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-# Provider CLIs update their own per-user credential/config/cache files. Keep
-# the service unprivileged, but do not make its user's home read-only.
+ProtectSystem=full
+# Provider CLIs and quota-monitor update per-user credential, cache, database,
+# token, and firmware files. "strict" would make HOME read-only as part of the
+# whole filesystem even with ProtectHome=false; "full" still protects
+# /usr, /boot, and /etc while leaving the unprivileged user's state writable.
 ProtectHome=false
 UMask=0077
 
