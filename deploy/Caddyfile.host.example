@@ -1,0 +1,24 @@
+# Replace monitor.example.com with the domain whose A/AAAA records point to
+# this server. The standalone process itself stays on 127.0.0.1:8787.
+monitor.example.com {
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+			preferred_chains {
+				root_common_name "ISRG Root X1"
+			}
+		}
+	}
+
+	encode zstd gzip
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Cache-Control "no-store"
+	}
+
+	reverse_proxy 127.0.0.1:8787
+}

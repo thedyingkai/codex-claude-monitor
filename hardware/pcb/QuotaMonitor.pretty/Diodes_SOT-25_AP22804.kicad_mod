@@ -1,0 +1,107 @@
+(footprint "Diodes_SOT-25_AP22804"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -2.4 0)
+		(layer "F.Fab")
+		(uuid "8daf2fc1-70c1-520e-9b76-06f4361ddc29")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Diodes_SOT-25_AP22804"
+		(at 0 2.4 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "5b3d1549-d062-5a63-8d87-ec37f22e33b2")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "e1cf143f-5bf0-5432-be2c-f02ead41ccc1")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "d883fc0b-378a-54e2-b4f5-a48689594387")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(fp_rect
+		(start -1.45 -1.4)
+		(end 1.45 1.4)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "5d664bc3-7ceb-5ab9-828e-44507be24c9e")
+	)
+	(fp_circle
+		(center -1.1 -1.05)
+		(end -0.9 -1.05)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill yes)
+		(layer "F.Fab")
+		(uuid "488f2eaa-4949-59a7-9028-f4a270197304")
+	)
+	(pad "1" smd rect
+		(at -1.2 -0.95)
+		(size 0.55 0.8)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "b6118449-dcc5-5368-96a8-9dec21f245ce")
+	)
+	(pad "2" smd rect
+		(at -1.2 0)
+		(size 0.55 0.8)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "1ed4c55e-c818-5e91-8955-b058013100b9")
+	)
+	(pad "3" smd rect
+		(at -1.2 0.95)
+		(size 0.55 0.8)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "bf2c7419-5189-5f95-acd0-c68a8e379864")
+	)
+	(pad "4" smd rect
+		(at 1.2 0.95)
+		(size 0.55 0.8)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "a372c3dd-5bb3-51eb-b167-b057887ddd24")
+	)
+	(pad "5" smd rect
+		(at 1.2 -0.95)
+		(size 0.55 0.8)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "fdc23798-c99e-510c-b3df-9db5ed417dba")
+	)
+	(embedded_fonts no)
+)

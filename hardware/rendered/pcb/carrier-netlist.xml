@@ -1,0 +1,1345 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<export version="E">
+  <design>
+    <source>/work/hardware/pcb/carrier.kicad_sch</source>
+    <date>2026-08-02T19:51:48+0000</date>
+    <tool>Eeschema 9.0.9</tool>
+    <sheet number="1" name="/" tstamps="/">
+      <title_block>
+        <title>Quota Monitor Carrier - ERC Schematic</title>
+        <company>Open hardware reference design</company>
+        <rev>0.3-prototype</rev>
+        <date>2026-08-03</date>
+        <source>carrier.kicad_sch</source>
+        <comment number="1" value="Prototype only: deep-discharge recharge recovery and enclosure clearance are unverified"/>
+        <comment number="2" value=""/>
+        <comment number="3" value=""/>
+        <comment number="4" value=""/>
+        <comment number="5" value=""/>
+        <comment number="6" value=""/>
+        <comment number="7" value=""/>
+        <comment number="8" value=""/>
+        <comment number="9" value=""/>
+      </title_block>
+    </sheet>
+  </design>
+  <components>
+    <comp ref="C1">
+      <value>0.1uF</value>
+      <footprint>QuotaMonitor:C_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_C1" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>bb3bb916-6a44-5ebe-8b32-78f201678486</tstamps>
+    </comp>
+    <comp ref="C2">
+      <value>0.1uF</value>
+      <footprint>QuotaMonitor:C_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_C2" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>4fb51053-9b26-5674-8012-449a7b359ae9</tstamps>
+    </comp>
+    <comp ref="C3">
+      <value>1uF</value>
+      <footprint>QuotaMonitor:C_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_C3" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>dbd9f274-052c-53fe-90d6-7fde965f5c6a</tstamps>
+    </comp>
+    <comp ref="C4">
+      <value>1uF</value>
+      <footprint>QuotaMonitor:C_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_C4" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d15ee0ca-535d-593b-92c2-6559f1bf4d53</tstamps>
+    </comp>
+    <comp ref="C5">
+      <value>0.1uF</value>
+      <footprint>QuotaMonitor:C_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_C5" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>78bc7d78-bdcf-5d8f-b50a-8d4484625007</tstamps>
+    </comp>
+    <comp ref="C6">
+      <value>0.1uF</value>
+      <footprint>QuotaMonitor:C_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_C6" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ea36c7b1-0036-5e90-9197-8bcca1eb39b0</tstamps>
+    </comp>
+    <comp ref="C7">
+      <value>10uF</value>
+      <footprint>QuotaMonitor:Murata_GRM21_Reflow_a1.10_b0.95_c0.95</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Murata_GRM21_Reflow_a1.10_b0.95_c0.95</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_C7" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>1745d1ce-d5bd-52a4-bc85-919312acf7c3</tstamps>
+    </comp>
+    <comp ref="F1">
+      <value>MF-NSMF150-2</value>
+      <footprint>QuotaMonitor:Bourns_MF-NSMF_1206</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Bourns_MF-NSMF_1206</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_F1" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>939cb041-b3bd-5956-aa9a-483856f3e751</tstamps>
+    </comp>
+    <comp ref="J1">
+      <value>S2B-PH-SM4-TB(LF)(SN)</value>
+      <footprint>QuotaMonitor:JST_PH_S2B-PH-SM4-TB_1x02_P2.00mm_Horizontal</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:JST_PH_S2B-PH-SM4-TB_1x02_P2.00mm_Horizontal</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_J1" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>7b748bd3-aeb3-5c12-bf77-314859c834df</tstamps>
+    </comp>
+    <comp ref="J2">
+      <value>S2B-PH-SM4-TB(LF)(SN)</value>
+      <footprint>QuotaMonitor:JST_PH_S2B-PH-SM4-TB_1x02_P2.00mm_Horizontal</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:JST_PH_S2B-PH-SM4-TB_1x02_P2.00mm_Horizontal</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_J2" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>11737c36-103c-5d27-972b-64a619a165ed</tstamps>
+    </comp>
+    <comp ref="J3">
+      <value>FH12-18S-0.5SH(55)</value>
+      <footprint>QuotaMonitor:Hirose_FH12-18S-0.5SH_1x18_P0.50mm</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Hirose_FH12-18S-0.5SH_1x18_P0.50mm</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_J3" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>860967ca-7005-5908-98e0-a7ab9dd275b2</tstamps>
+    </comp>
+    <comp ref="J4">
+      <value>FH12-18S-0.5SH(55)</value>
+      <footprint>QuotaMonitor:Hirose_FH12-18S-0.5SH_1x18_P0.50mm</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Hirose_FH12-18S-0.5SH_1x18_P0.50mm</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_J4" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f8021804-bdaf-50b4-b4fd-c7f80f84313f</tstamps>
+    </comp>
+    <comp ref="J5">
+      <value>TSW-107-07-G-S</value>
+      <footprint>QuotaMonitor:PinHeader_1x07_P2.54mm</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:PinHeader_1x07_P2.54mm</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_J5" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>08c3c8e5-1c6b-53f5-a0fe-0b4ec650a104</tstamps>
+    </comp>
+    <comp ref="Q1">
+      <value>Si5908BDC-T1-GE3</value>
+      <footprint>QuotaMonitor:Vishay_1206-8_ChipFET</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Vishay_1206-8_ChipFET</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_Q1" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>1cfc6585-3a3b-51b7-8380-3516a7619bcc</tstamps>
+    </comp>
+    <comp ref="R1">
+      <value>4.7k</value>
+      <footprint>QuotaMonitor:R_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_R1" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>2dff8eb2-52b4-51f4-b759-7dc3265f34d0</tstamps>
+    </comp>
+    <comp ref="R2">
+      <value>4.7k</value>
+      <footprint>QuotaMonitor:R_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_R2" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>04b14e00-f918-5941-94f6-f1df46327556</tstamps>
+    </comp>
+    <comp ref="R3">
+      <value>100k</value>
+      <footprint>QuotaMonitor:R_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_R3" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>fed0b6db-9fbd-565c-872a-95086d894b54</tstamps>
+    </comp>
+    <comp ref="R4">
+      <value>100k</value>
+      <footprint>QuotaMonitor:R_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_R4" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>879a8b24-e7cd-54eb-bb76-addb9a6209fc</tstamps>
+    </comp>
+    <comp ref="R5">
+      <value>100k</value>
+      <footprint>QuotaMonitor:R_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_R5" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>85429897-80ed-5cf5-86da-a8f5d1f06c9f</tstamps>
+    </comp>
+    <comp ref="R6">
+      <value>100k</value>
+      <footprint>QuotaMonitor:R_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_R6" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d07cce17-70e6-5a8f-89ee-1395b823be10</tstamps>
+    </comp>
+    <comp ref="R7">
+      <value>10k</value>
+      <footprint>QuotaMonitor:R_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_R7" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>0f22dbe4-1561-5d85-b237-91d7eee885e4</tstamps>
+    </comp>
+    <comp ref="R8">
+      <value>100k</value>
+      <footprint>QuotaMonitor:R_0603</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_R8" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>38335ff7-8c9d-5008-af18-89d0a0410450</tstamps>
+    </comp>
+    <comp ref="SW1">
+      <value>PCM12SMTR</value>
+      <footprint>QuotaMonitor:C&amp;K_PCM12SMTR</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:C&amp;K_PCM12SMTR</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_SW1" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>67afc44e-b117-5a31-86b7-343d4140944e</tstamps>
+    </comp>
+    <comp ref="SW2">
+      <value>PTS850VR18PSMTR LFS</value>
+      <footprint>QuotaMonitor:C&amp;K_PTS850_with_boss_actuator_plusX</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:C&amp;K_PTS850_with_boss_actuator_plusX</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_SW2" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>5317786e-3ed6-57cd-a534-163127fc238e</tstamps>
+    </comp>
+    <comp ref="SW3">
+      <value>PTS850VR18PSMTR LFS</value>
+      <footprint>QuotaMonitor:C&amp;K_PTS850_with_boss_actuator_plusX</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:C&amp;K_PTS850_with_boss_actuator_plusX</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_SW3" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>eb3db105-3f96-5a26-a15f-666596675b86</tstamps>
+    </comp>
+    <comp ref="TP1">
+      <value>Keystone 5015</value>
+      <footprint>QuotaMonitor:Keystone_5015_SMT</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_TP1" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>fd7312af-89d4-5c60-a25c-eaa051536959</tstamps>
+    </comp>
+    <comp ref="TP2">
+      <value>Keystone 5015</value>
+      <footprint>QuotaMonitor:Keystone_5015_SMT</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_TP2" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ef97cbdd-61e4-5b3f-aed3-9f644b3ee80d</tstamps>
+    </comp>
+    <comp ref="TP3">
+      <value>Keystone 5015</value>
+      <footprint>QuotaMonitor:Keystone_5015_SMT</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_TP3" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d17bff45-62be-5fad-9fb5-aeec295d4231</tstamps>
+    </comp>
+    <comp ref="TP4">
+      <value>Keystone 5015</value>
+      <footprint>QuotaMonitor:Keystone_5015_SMT</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_TP4" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b3d5f838-67f7-5633-b3b9-ea07ced7c4cc</tstamps>
+    </comp>
+    <comp ref="TP5">
+      <value>Keystone 5015</value>
+      <footprint>QuotaMonitor:Keystone_5015_SMT</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_TP5" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f52ff7bb-d18f-5415-818e-79bcab91269b</tstamps>
+    </comp>
+    <comp ref="TP6">
+      <value>Keystone 5015</value>
+      <footprint>QuotaMonitor:Keystone_5015_SMT</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_TP6" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>29eacf93-7b55-5464-abde-1be90efa5369</tstamps>
+    </comp>
+    <comp ref="U1">
+      <value>MAX17048G+T10</value>
+      <footprint>QuotaMonitor:ADI_TDFN-8-1EP_2x2_P0.5_EP0.8x1.2</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:ADI_TDFN-8-1EP_2x2_P0.5_EP0.8x1.2</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_U1" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>52c6b700-c34c-5555-95c2-8d35021c559e</tstamps>
+    </comp>
+    <comp ref="U2">
+      <value>AP22804AW5-7</value>
+      <footprint>QuotaMonitor:Diodes_SOT-25_AP22804</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:Diodes_SOT-25_AP22804</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_U2" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>53a5f512-849e-5993-96ab-e27eeef97e53</tstamps>
+    </comp>
+    <comp ref="U3">
+      <value>LTC4365ITS8#TRMPBF</value>
+      <footprint>QuotaMonitor:TSOT-23-8</footprint>
+      <datasheet>~</datasheet>
+      <description>Quota monitor ERC symbol</description>
+      <fields>
+        <field name="Footprint">QuotaMonitor:TSOT-23-8</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol</field>
+      </fields>
+      <libsource lib="QuotaMonitor" part="QM_U3" description="Quota monitor ERC symbol with declared electrical pin types"/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="carrier.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>3e76f9e0-29da-54ac-91e4-ffa54ba58ef5</tstamps>
+    </comp>
+  </components>
+  <libparts>
+    <libpart lib="QuotaMonitor" part="QM_C1">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">C</field>
+        <field name="Value">0.1uF</field>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_C2">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">C</field>
+        <field name="Value">0.1uF</field>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_C3">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">C</field>
+        <field name="Value">1uF</field>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_C4">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">C</field>
+        <field name="Value">1uF</field>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_C5">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">C</field>
+        <field name="Value">0.1uF</field>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_C6">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">C</field>
+        <field name="Value">0.1uF</field>
+        <field name="Footprint">QuotaMonitor:C_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_C7">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">C</field>
+        <field name="Value">10uF</field>
+        <field name="Footprint">QuotaMonitor:Murata_GRM21_Reflow_a1.10_b0.95_c0.95</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_F1">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">F</field>
+        <field name="Value">MF-NSMF150-2</field>
+        <field name="Footprint">QuotaMonitor:Bourns_MF-NSMF_1206</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_J1">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">S2B-PH-SM4-TB(LF)(SN)</field>
+        <field name="Footprint">QuotaMonitor:JST_PH_S2B-PH-SM4-TB_1x02_P2.00mm_Horizontal</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="BAT+" type="power_out"/>
+        <pin num="2" name="BAT-" type="power_out"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_J2">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">S2B-PH-SM4-TB(LF)(SN)</field>
+        <field name="Footprint">QuotaMonitor:JST_PH_S2B-PH-SM4-TB_1x02_P2.00mm_Horizontal</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="SYS+" type="passive"/>
+        <pin num="2" name="SYS-" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_J3">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">FH12-18S-0.5SH(55)</field>
+        <field name="Footprint">QuotaMonitor:Hirose_FH12-18S-0.5SH_1x18_P0.50mm</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="3V3" type="power_out"/>
+        <pin num="2" name="LCD_BL" type="output"/>
+        <pin num="3" name="GND" type="passive"/>
+        <pin num="4" name="SCLK" type="output"/>
+        <pin num="5" name="MOSI" type="output"/>
+        <pin num="6" name="MISO" type="input"/>
+        <pin num="7" name="LCD_DC" type="output"/>
+        <pin num="8" name="LCD_RST" type="output"/>
+        <pin num="9" name="LCD_CS" type="output"/>
+        <pin num="10" name="SD_CS" type="output"/>
+        <pin num="11" name="LCD_POWER_EN" type="output"/>
+        <pin num="12" name="TOUCH_CS" type="output"/>
+        <pin num="13" name="SCL" type="output"/>
+        <pin num="14" name="SDA" type="bidirectional"/>
+        <pin num="15" name="INT" type="input"/>
+        <pin num="16" name="BUSY" type="input"/>
+        <pin num="17" name="X1" type="passive"/>
+        <pin num="18" name="X2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_J4">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">FH12-18S-0.5SH(55)</field>
+        <field name="Footprint">QuotaMonitor:Hirose_FH12-18S-0.5SH_1x18_P0.50mm</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="DISP_3V3" type="power_in"/>
+        <pin num="2" name="LCD_BL" type="input"/>
+        <pin num="3" name="GND" type="passive"/>
+        <pin num="4" name="SCLK" type="input"/>
+        <pin num="5" name="MOSI" type="input"/>
+        <pin num="6" name="MISO" type="output"/>
+        <pin num="7" name="LCD_DC" type="input"/>
+        <pin num="8" name="LCD_RST" type="input"/>
+        <pin num="9" name="LCD_CS" type="input"/>
+        <pin num="10" name="SD_CS" type="input"/>
+        <pin num="11" name="LCD_POWER_EN" type="input"/>
+        <pin num="12" name="TOUCH_CS" type="input"/>
+        <pin num="13" name="SCL" type="input"/>
+        <pin num="14" name="SDA" type="bidirectional"/>
+        <pin num="15" name="INT" type="output"/>
+        <pin num="16" name="BUSY" type="output"/>
+        <pin num="17" name="X1" type="passive"/>
+        <pin num="18" name="X2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_J5">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">TSW-107-07-G-S</field>
+        <field name="Footprint">QuotaMonitor:PinHeader_1x07_P2.54mm</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="GPIO47" type="bidirectional"/>
+        <pin num="2" name="GPIO8" type="bidirectional"/>
+        <pin num="3" name="GPIO5" type="bidirectional"/>
+        <pin num="4" name="VCC" type="power_out"/>
+        <pin num="5" name="GND" type="passive"/>
+        <pin num="6" name="GPIO6" type="bidirectional"/>
+        <pin num="7" name="ALERT" type="bidirectional"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_Q1">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">Q</field>
+        <field name="Value">Si5908BDC-T1-GE3</field>
+        <field name="Footprint">QuotaMonitor:Vishay_1206-8_ChipFET</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="S1" type="passive"/>
+        <pin num="2" name="G1" type="input"/>
+        <pin num="3" name="S2" type="passive"/>
+        <pin num="4" name="G2" type="input"/>
+        <pin num="5" name="D2" type="passive"/>
+        <pin num="6" name="D2" type="passive"/>
+        <pin num="7" name="D1" type="passive"/>
+        <pin num="8" name="D1" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_R1">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_R2">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_R3">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">100k</field>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_R4">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">100k</field>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_R5">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">100k</field>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_R6">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">100k</field>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_R7">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">10k</field>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_R8">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">100k</field>
+        <field name="Footprint">QuotaMonitor:R_0603</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_SW1">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">S</field>
+        <field name="Value">PCM12SMTR</field>
+        <field name="Footprint">QuotaMonitor:C&amp;K_PCM12SMTR</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="OFF" type="passive"/>
+        <pin num="2" name="COMMON" type="passive"/>
+        <pin num="3" name="ON" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_SW2">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">S</field>
+        <field name="Value">PTS850VR18PSMTR LFS</field>
+        <field name="Footprint">QuotaMonitor:C&amp;K_PTS850_with_boss_actuator_plusX</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="A1" type="passive"/>
+        <pin num="2" name="B1" type="passive"/>
+        <pin num="3" name="A2" type="passive"/>
+        <pin num="4" name="B2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_SW3">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">S</field>
+        <field name="Value">PTS850VR18PSMTR LFS</field>
+        <field name="Footprint">QuotaMonitor:C&amp;K_PTS850_with_boss_actuator_plusX</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="A1" type="passive"/>
+        <pin num="2" name="B1" type="passive"/>
+        <pin num="3" name="A2" type="passive"/>
+        <pin num="4" name="B2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_TP1">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">T</field>
+        <field name="Value">Keystone 5015</field>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="VBAT_SAFE" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_TP2">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">T</field>
+        <field name="Value">Keystone 5015</field>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="3V3" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_TP3">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">T</field>
+        <field name="Value">Keystone 5015</field>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_TP4">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">T</field>
+        <field name="Value">Keystone 5015</field>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="USB_5V" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_TP5">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">T</field>
+        <field name="Value">Keystone 5015</field>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="SDA" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_TP6">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">T</field>
+        <field name="Value">Keystone 5015</field>
+        <field name="Footprint">QuotaMonitor:Keystone_5015_SMT</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="SCL" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_U1">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">MAX17048G+T10</field>
+        <field name="Footprint">QuotaMonitor:ADI_TDFN-8-1EP_2x2_P0.5_EP0.8x1.2</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="CTG" type="input"/>
+        <pin num="2" name="CELL" type="power_in"/>
+        <pin num="3" name="VDD" type="power_in"/>
+        <pin num="4" name="GND" type="power_in"/>
+        <pin num="5" name="ALRT" type="open_collector"/>
+        <pin num="6" name="QSTRT" type="input"/>
+        <pin num="7" name="SCL" type="input"/>
+        <pin num="8" name="SDA" type="bidirectional"/>
+        <pin num="9" name="EP" type="power_in"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_U2">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">AP22804AW5-7</field>
+        <field name="Footprint">QuotaMonitor:Diodes_SOT-25_AP22804</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="OUT" type="power_out"/>
+        <pin num="2" name="GND" type="power_in"/>
+        <pin num="3" name="FLG" type="open_collector"/>
+        <pin num="4" name="EN" type="input"/>
+        <pin num="5" name="IN" type="power_in"/>
+      </pins>
+    </libpart>
+    <libpart lib="QuotaMonitor" part="QM_U3">
+      <description>Quota monitor ERC symbol with declared electrical pin types</description>
+      <docs>~</docs>
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">LTC4365ITS8#TRMPBF</field>
+        <field name="Footprint">QuotaMonitor:TSOT-23-8</field>
+        <field name="Datasheet">~</field>
+        <field name="Description">Quota monitor ERC symbol with declared electrical pin types</field>
+      </fields>
+      <pins>
+        <pin num="1" name="GATE" type="output"/>
+        <pin num="2" name="VOUT" type="power_in"/>
+        <pin num="3" name="FAULT" type="open_collector"/>
+        <pin num="4" name="SHDN" type="input"/>
+        <pin num="5" name="VIN" type="power_in"/>
+        <pin num="6" name="UV" type="input"/>
+        <pin num="7" name="OV" type="input"/>
+        <pin num="8" name="GND" type="power_in"/>
+      </pins>
+    </libpart>
+  </libparts>
+  <libraries>
+    <library logical="QuotaMonitor">
+      <uri>/work/hardware/pcb/QuotaMonitor.kicad_sym</uri>
+    </library>
+  </libraries>
+  <nets>
+    <net code="1" name="/3V3" class="Default">
+      <node ref="C3" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J3" pin="1" pinfunction="3V3" pintype="power_out"/>
+      <node ref="R1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R2" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R7" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="TP2" pin="1" pinfunction="3V3" pintype="passive"/>
+      <node ref="U2" pin="5" pinfunction="IN" pintype="power_in"/>
+    </net>
+    <net code="2" name="/ALERT" class="Default">
+      <node ref="J5" pin="7" pinfunction="ALERT" pintype="bidirectional"/>
+      <node ref="R7" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="5" pinfunction="ALRT" pintype="open_collector"/>
+    </net>
+    <net code="3" name="/BAT_FUSED" class="Default">
+      <node ref="C6" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="F1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="Q1" pin="7" pinfunction="D1" pintype="passive"/>
+      <node ref="Q1" pin="8" pinfunction="D1" pintype="passive"/>
+      <node ref="R5" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R8" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="U3" pin="5" pinfunction="VIN" pintype="power_in"/>
+    </net>
+    <net code="4" name="/BAT_RAW" class="Default">
+      <node ref="F1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J1" pin="1" pinfunction="BAT+" pintype="power_out"/>
+    </net>
+    <net code="5" name="/BTN_A" class="Default">
+      <node ref="J5" pin="1" pinfunction="GPIO47" pintype="bidirectional"/>
+      <node ref="SW2" pin="1" pinfunction="A1" pintype="passive"/>
+      <node ref="SW2" pin="3" pinfunction="A2" pintype="passive"/>
+    </net>
+    <net code="6" name="/BTN_B" class="Default">
+      <node ref="J5" pin="2" pinfunction="GPIO8" pintype="bidirectional"/>
+      <node ref="SW3" pin="1" pinfunction="A1" pintype="passive"/>
+      <node ref="SW3" pin="3" pinfunction="A2" pintype="passive"/>
+    </net>
+    <net code="7" name="/BUSY" class="Default">
+      <node ref="J3" pin="16" pinfunction="BUSY" pintype="input"/>
+      <node ref="J4" pin="16" pinfunction="BUSY" pintype="output"/>
+    </net>
+    <net code="8" name="/DISP_3V3" class="Default">
+      <node ref="C4" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J4" pin="1" pinfunction="DISP_3V3" pintype="power_in"/>
+      <node ref="U2" pin="1" pinfunction="OUT" pintype="power_out"/>
+    </net>
+    <net code="9" name="/FET_COMMON" class="Default">
+      <node ref="Q1" pin="1" pinfunction="S1" pintype="passive"/>
+      <node ref="Q1" pin="3" pinfunction="S2" pintype="passive"/>
+    </net>
+    <net code="10" name="/GND" class="Default">
+      <node ref="C1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C2" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C3" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C4" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C5" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C6" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C7" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="J1" pin="2" pinfunction="BAT-" pintype="power_out"/>
+      <node ref="J2" pin="2" pinfunction="SYS-" pintype="passive"/>
+      <node ref="J3" pin="3" pinfunction="GND" pintype="passive"/>
+      <node ref="J4" pin="3" pinfunction="GND" pintype="passive"/>
+      <node ref="J5" pin="5" pinfunction="GND" pintype="passive"/>
+      <node ref="R4" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R6" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="SW1" pin="1" pinfunction="OFF" pintype="passive"/>
+      <node ref="SW2" pin="2" pinfunction="B1" pintype="passive"/>
+      <node ref="SW2" pin="4" pinfunction="B2" pintype="passive"/>
+      <node ref="SW3" pin="2" pinfunction="B1" pintype="passive"/>
+      <node ref="SW3" pin="4" pinfunction="B2" pintype="passive"/>
+      <node ref="TP3" pin="1" pinfunction="GND" pintype="passive"/>
+      <node ref="U1" pin="1" pinfunction="CTG" pintype="input"/>
+      <node ref="U1" pin="4" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="6" pinfunction="QSTRT" pintype="input"/>
+      <node ref="U1" pin="9" pinfunction="EP" pintype="power_in"/>
+      <node ref="U2" pin="2" pinfunction="GND" pintype="power_in"/>
+      <node ref="U3" pin="7" pinfunction="OV" pintype="input"/>
+      <node ref="U3" pin="8" pinfunction="GND" pintype="power_in"/>
+    </net>
+    <net code="11" name="/INT" class="Default">
+      <node ref="J3" pin="15" pinfunction="INT" pintype="input"/>
+      <node ref="J4" pin="15" pinfunction="INT" pintype="output"/>
+    </net>
+    <net code="12" name="/LCD_BL" class="Default">
+      <node ref="J3" pin="2" pinfunction="LCD_BL" pintype="output"/>
+      <node ref="J4" pin="2" pinfunction="LCD_BL" pintype="input"/>
+    </net>
+    <net code="13" name="/LCD_CS" class="Default">
+      <node ref="J3" pin="9" pinfunction="LCD_CS" pintype="output"/>
+      <node ref="J4" pin="9" pinfunction="LCD_CS" pintype="input"/>
+    </net>
+    <net code="14" name="/LCD_DC" class="Default">
+      <node ref="J3" pin="7" pinfunction="LCD_DC" pintype="output"/>
+      <node ref="J4" pin="7" pinfunction="LCD_DC" pintype="input"/>
+    </net>
+    <net code="15" name="/LCD_POWER_EN" class="Default">
+      <node ref="J3" pin="11" pinfunction="LCD_POWER_EN" pintype="output"/>
+      <node ref="J4" pin="11" pinfunction="LCD_POWER_EN" pintype="input"/>
+      <node ref="R6" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="U2" pin="4" pinfunction="EN" pintype="input"/>
+    </net>
+    <net code="16" name="/LCD_RST" class="Default">
+      <node ref="J3" pin="8" pinfunction="LCD_RST" pintype="output"/>
+      <node ref="J4" pin="8" pinfunction="LCD_RST" pintype="input"/>
+    </net>
+    <net code="17" name="/MISO" class="Default">
+      <node ref="J3" pin="6" pinfunction="MISO" pintype="input"/>
+      <node ref="J4" pin="6" pinfunction="MISO" pintype="output"/>
+    </net>
+    <net code="18" name="/MOSI" class="Default">
+      <node ref="J3" pin="5" pinfunction="MOSI" pintype="output"/>
+      <node ref="J4" pin="5" pinfunction="MOSI" pintype="input"/>
+    </net>
+    <net code="19" name="/POWER_SW" class="Default">
+      <node ref="J5" pin="3" pinfunction="GPIO5" pintype="bidirectional"/>
+      <node ref="SW1" pin="2" pinfunction="COMMON" pintype="passive"/>
+    </net>
+    <net code="20" name="/PROT_GATE" class="Default">
+      <node ref="Q1" pin="2" pinfunction="G1" pintype="input"/>
+      <node ref="Q1" pin="4" pinfunction="G2" pintype="input"/>
+      <node ref="U3" pin="1" pinfunction="GATE" pintype="output"/>
+    </net>
+    <net code="21" name="/PROT_SHDN" class="Default">
+      <node ref="R5" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U3" pin="4" pinfunction="SHDN" pintype="input"/>
+    </net>
+    <net code="22" name="/PROT_UV" class="Default">
+      <node ref="R8" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U3" pin="6" pinfunction="UV" pintype="input"/>
+    </net>
+    <net code="23" name="/SCL" class="Default">
+      <node ref="J3" pin="13" pinfunction="SCL" pintype="output"/>
+      <node ref="J4" pin="13" pinfunction="SCL" pintype="input"/>
+      <node ref="R1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="TP6" pin="1" pinfunction="SCL" pintype="passive"/>
+      <node ref="U1" pin="7" pinfunction="SCL" pintype="input"/>
+    </net>
+    <net code="24" name="/SCLK" class="Default">
+      <node ref="J3" pin="4" pinfunction="SCLK" pintype="output"/>
+      <node ref="J4" pin="4" pinfunction="SCLK" pintype="input"/>
+    </net>
+    <net code="25" name="/SDA" class="Default">
+      <node ref="J3" pin="14" pinfunction="SDA" pintype="bidirectional"/>
+      <node ref="J4" pin="14" pinfunction="SDA" pintype="bidirectional"/>
+      <node ref="R2" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="TP5" pin="1" pinfunction="SDA" pintype="passive"/>
+      <node ref="U1" pin="8" pinfunction="SDA" pintype="bidirectional"/>
+    </net>
+    <net code="26" name="/SD_CS" class="Default">
+      <node ref="J3" pin="10" pinfunction="SD_CS" pintype="output"/>
+      <node ref="J4" pin="10" pinfunction="SD_CS" pintype="input"/>
+    </net>
+    <net code="27" name="/TOUCH_CS" class="Default">
+      <node ref="J3" pin="12" pinfunction="TOUCH_CS" pintype="output"/>
+      <node ref="J4" pin="12" pinfunction="TOUCH_CS" pintype="input"/>
+    </net>
+    <net code="28" name="/USB_5V" class="Default">
+      <node ref="J5" pin="4" pinfunction="VCC" pintype="power_out"/>
+      <node ref="R3" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="TP4" pin="1" pinfunction="USB_5V" pintype="passive"/>
+    </net>
+    <net code="29" name="/USB_SENSE" class="Default">
+      <node ref="C5" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J5" pin="6" pinfunction="GPIO6" pintype="bidirectional"/>
+      <node ref="R3" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R4" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="30" name="/VBAT_SAFE" class="Default">
+      <node ref="C1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C2" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C7" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J2" pin="1" pinfunction="SYS+" pintype="passive"/>
+      <node ref="Q1" pin="5" pinfunction="D2" pintype="passive"/>
+      <node ref="Q1" pin="6" pinfunction="D2" pintype="passive"/>
+      <node ref="TP1" pin="1" pinfunction="VBAT_SAFE" pintype="passive"/>
+      <node ref="U1" pin="2" pinfunction="CELL" pintype="power_in"/>
+      <node ref="U1" pin="3" pinfunction="VDD" pintype="power_in"/>
+      <node ref="U3" pin="2" pinfunction="VOUT" pintype="power_in"/>
+    </net>
+    <net code="31" name="/X1" class="Default">
+      <node ref="J3" pin="17" pinfunction="X1" pintype="passive"/>
+      <node ref="J4" pin="17" pinfunction="X1" pintype="passive"/>
+    </net>
+    <net code="32" name="/X2" class="Default">
+      <node ref="J3" pin="18" pinfunction="X2" pintype="passive"/>
+      <node ref="J4" pin="18" pinfunction="X2" pintype="passive"/>
+    </net>
+    <net code="33" name="unconnected-(SW1-ON-Pad3)" class="Default">
+      <node ref="SW1" pin="3" pinfunction="ON" pintype="passive+no_connect"/>
+    </net>
+    <net code="34" name="unconnected-(U2-FLG-Pad3)" class="Default">
+      <node ref="U2" pin="3" pinfunction="FLG" pintype="open_collector+no_connect"/>
+    </net>
+    <net code="35" name="unconnected-(U3-FAULT-Pad3)" class="Default">
+      <node ref="U3" pin="3" pinfunction="FAULT" pintype="open_collector+no_connect"/>
+    </net>
+  </nets>
+</export>

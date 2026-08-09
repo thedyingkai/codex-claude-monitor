@@ -1,0 +1,19 @@
+Item,References,Qty,Manufacturer,MPN,Description,Package,Populate,Notes
+1,J1 J2,2,JST,S2B-PH-SM4-TB(LF)(SN),2-pin side-entry battery connector,JST PH SMT side-entry,YES,"4.5mm body height conflicts with current screen stack; prototype fit-check required"
+2,F1,1,Bourns,MF-NSMF150-2,1.5A resettable PTC,MF-NSMF 1206,YES,"1.0x1.6mm lands at 3.0mm centers"
+3,Q1,1,Vishay,Si5908BDC-T1-GE3,Dual N-channel MOSFET for back-to-back isolation,1206-8 ChipFET,YES,"Official pinout: 1=S1 2=G1 3=S2 4=G2 5/6=D2 7/8=D1"
+4,U3,1,Analog Devices,LTC4365ITS8#TRMPBF,Reverse-supply gate controller in R0.1,TSOT-23-8,YES,"External UV/OV thresholds are intentionally disabled; do not claim UV/OV protection; protected-pack 0V USB recharge recovery is not proven"
+5,R5 R6 R8,3,Yageo,RC0603FR-07100KL,100k 1% resistor,0603,YES,
+6,C1 C2 C5 C6,4,Murata,GRM188R71C104KA01D,0.1uF 16V X7R capacitor,0603,YES,
+7,C7,1,Murata,GRM21BR61A106KE19L,10uF 10V X5R capacitor,0805/2012,YES,"Murata GRM21 reflow land a=1.10 b=0.95 c=0.95mm; SimSurfing 4.2V effective capacitance and battery transient behavior are not yet verified"
+8,U1,1,Analog Devices,MAX17048G+T10,1-cell ModelGauge fuel gauge,TDFN-8-EP T822+3,YES,"Pin 2 CELL and pin 3 VDD both connect to VBAT_SAFE"
+9,R1 R2,2,Yageo,RC0603FR-074K7L,4.7k 1% I2C pull-up,0603,YES,
+10,R7,1,Yageo,RC0603FR-0710KL,10k 1% ALERT pull-up,0603,YES,
+11,U2,1,Diodes Incorporated,AP22804AW5-7,2.5A active-high protected load switch,SOT-25,YES,"C4/output transient and display inrush require prototype measurement"
+12,C3 C4,2,Murata,GRM188R60J105KA01D,1uF 6.3V X5R capacitor,0603,YES,
+13,J3 J4,2,Hirose,FH12-18S-0.5SH(55),18-position 0.5mm bottom-contact FPC receptacle,FH12-18,YES,"Use 0.3mm FPC and verify contact-side orientation"
+14,J5,1,Samtec,TSW-107-07-G-S,1x7 2.54mm auxiliary header,Through-hole 1x07,NO,"DNP for enclosed build; finished hole 1.02mm; use only on open prototype or replace with a separately qualified low-profile wire termination"
+15,SW1,1,C&K,PCM12SMTR,SPDT side slide switch,PCM12 SMT,YES,"Rotated 270 degrees: actuator faces +X wall and travels along Y; cap/slot requires physical fit validation"
+16,SW2 SW3,2,C&K,PTS850VR18PSMTR LFS,Side-actuated normally-open tactile switch,PTS850 boss SMT,YES,"Audited with-boss footprint at 0 degrees: actuator +X; pads TL=1 signal TR=2 GND BL=3 signal BR=4 GND at local x=+/-1.70 y=+/-2.90mm; 0.9mm bosses at local x=+/-1.50 y=0"
+17,R3 R4,2,Yageo,RC0603FR-07100KL,100k 1% USB sense divider,0603,YES,
+18,TP1 TP2 TP3 TP4 TP5 TP6,6,Keystone,5015,Micro-miniature SMT loop test point,1.0x1.5mm SMT land,YES,"Tape-and-reel SMT part; not a through-hole test point"

@@ -1,0 +1,28 @@
+[Unit]
+Description=Codex and Claude standalone quota monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/quota-monitor
+Environment="PATH=%h/.local/bin:%h/.local/share/pnpm:%h/.npm-global/bin:/usr/local/bin:/usr/bin:/bin"
+# Claude is disabled by default. Codex CLI officially requires at least 4 GB
+# RAM (8 GB recommended); Claude Code requires 4 GB+. Standalone defaults to
+# serial Codex-then-Claude collection and releases app-server between probes,
+# reducing overlap but not either CLI's own peak. A 512 MB host remains
+# unsupported, needs swap and continuous memory/OOM monitoring.
+# Use absolute --codex-command/--claude-command paths for nvm/asdf installs.
+ExecStart=%h/.local/bin/quota-monitor standalone --listen=127.0.0.1:8787 --db=%h/.local/share/quota-monitor/monitor.db --display-token-file=%h/.local/share/quota-monitor/display.token --hook-secret-file=%h/.quota-monitor/hook-secret --claude=false --sequential-collection=true --log-format=text
+Restart=on-failure
+RestartSec=15s
+TimeoutStopSec=20s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+# Official CLIs must be able to update their per-user credentials and caches.
+ProtectHome=false
+UMask=0077
+
+[Install]
+WantedBy=default.target

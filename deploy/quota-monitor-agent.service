@@ -1,0 +1,20 @@
+[Unit]
+Description=Codex and Claude quota monitor agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment="PATH=%h/.local/bin:%h/.local/share/pnpm:%h/.npm-global/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=%h/.local/bin/quota-monitor agent --config %h/.config/quota-monitor/agent.json
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+# Codex and Claude Code must be able to update their normal per-user stores.
+ProtectHome=false
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,24 @@
+{$MONITOR_DOMAIN} {
+	# The display firmware pins ISRG Root X1, so request a matching
+	# Let's Encrypt chain instead of allowing a different ACME issuer.
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+			preferred_chains {
+				root_common_name "ISRG Root X1"
+			}
+		}
+	}
+
+	encode zstd gzip
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Cache-Control "no-store"
+	}
+
+	reverse_proxy monitor:8787
+}

@@ -1,0 +1,57 @@
+# Go
+/bin/
+/dist/
+/.tools/
+/work/
+*.test
+coverage.out
+
+# Runtime state and secrets
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.token
+.env
+.env.*
+!**/.env.example
+config.local.json
+*.log
+*.log.*
+*.tmp
+*~
+
+# Private keys and host-specific PKI
+*.key
+*.key.pem
+*.p12
+*.pfx
+*.jks
+*.csr
+*.token.*
+*.private.xml
+/deploy/pki/
+/firmware/certs/private/
+/firmware/certs/device-root-ca.pem
+
+# One-off production deployment helpers. Keep these local: they may contain
+# server addresses, workstation paths, or operational assumptions.
+/deploy/xshell-*.vbs
+/deploy/server-ip/
+/deploy/token-rotation/
+/docs/device-tls.md
+
+# Firmware
+/firmware/.pio/
+/firmware/include/device_config.h
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
+
+# Local EDA UI state
+*.kicad_prl

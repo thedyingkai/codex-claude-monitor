@@ -1,0 +1,61 @@
+(footprint "MountingHole_2.6mm"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -2.5 0)
+		(layer "F.Fab")
+		(uuid "79b7146f-22fb-557e-b50d-36d515d94dce")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "MountingHole_2.6mm"
+		(at 0 2.5 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "d7034579-823d-59e8-b5d2-68cc2043eaa3")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "de47a2b7-0573-587a-ae23-f58893b7239f")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "fea6b1fa-90c9-568f-9059-e1aed9103530")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "" np_thru_hole circle
+		(at 0 0)
+		(size 2.6 2.6)
+		(drill 2.6)
+		(layers "*.Cu" "*.Mask")
+		(uuid "db93732f-f6c1-5cfc-bd8c-8b695480e092")
+	)
+	(embedded_fonts no)
+)

@@ -1,0 +1,8 @@
+Category,Qty,Manufacturer/Source,Model/Search name,Requirement,Assembly note
+Display controller,1,Keyes,62520093 E32R28T 2.8inch ESP32-32E touch version,"ESP32-32E; ILI9341V; XPT2046; Type-C; 4MB Flash","Purchased; no separate Wi-Fi module"
+Battery,1,Qualified battery supplier,3.7V 1S protected LiPo with MX1.25-2P,"Protection PCB; polarity matches actual E32R28T; supplier safety documents; measured envelope recorded","Direct plug only after polarity check; never solder cell tabs"
+USB data cable,1,Reputable supplier,USB-A/C-to-Type-C data cable,"Must carry data, not charge-only; suitable for CH340C flashing",Used for flashing and maintenance
+USB power supply,1,Reputable certified supplier,5V USB supply,"5V regulated; >=1A; compliant certification",Do not use an unknown or damaged charger
+Insulation sheet,1,Electrical insulation supplier,Flame-retardant electrical insulation film,"Large enough to isolate battery from PCB solder joints and metal edges",No conductive foil
+Cushion/strain relief,As needed,Electrical/mechanical supplier,Thin flame-retardant closed-cell foam and non-conductive tape,"No compression of LiPo pouch; secure protection board and lead exit",Do not wrap the whole cell in hot glue
+Enclosure hardware,As needed,Local print/fastener supplier,E32R28T measured-fit rear enclosure,"Designed from purchased board and battery measurements; Type-C and swelling clearance",Old DFRobot enclosure is incompatible

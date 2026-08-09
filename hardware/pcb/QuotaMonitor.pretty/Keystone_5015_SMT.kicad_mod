@@ -1,0 +1,83 @@
+(footprint "Keystone_5015_SMT"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -1.9 0)
+		(layer "F.Fab")
+		(uuid "e31e099c-7701-5dd7-bf29-f198a4a8061c")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Keystone_5015_SMT"
+		(at 0 1.9 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "401e0181-8e47-5fa8-90ce-23cfacdd812a")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "057e159b-5330-53da-8ed7-68bf63d8d07b")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "a74d0140-1e14-5b11-9ff8-76f7e9e3996d")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(fp_rect
+		(start -1.7 -0.9)
+		(end 1.7 0.9)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "b1fbabd6-51a3-56ea-afb2-f0b9c8aae5a3")
+	)
+	(fp_circle
+		(center -1.35 -0.55)
+		(end -1.15 -0.55)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill yes)
+		(layer "F.Fab")
+		(uuid "cebc3f5b-889a-50f9-b6c9-799eb31689b9")
+	)
+	(pad "1" smd rect
+		(at 0 0)
+		(size 1 1.5)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "8ea34026-a3a2-55f9-945a-5f1f2dacde0c")
+	)
+	(embedded_fonts no)
+)

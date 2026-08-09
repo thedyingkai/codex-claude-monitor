@@ -1,0 +1,175 @@
+openapi: 3.1.0
+info:
+  title: Codex Claude Quota Monitor API
+  version: 1.0.0
+  description: Read-only display snapshots and authenticated full-state agent reports.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: https://{domain}
+    description: Operator-provided Caddy HTTPS endpoint
+    variables:
+      domain:
+        default: quota-monitor.invalid
+        description: Replace with the deployed monitor domain.
+paths:
+  /healthz:
+    get:
+      summary: Check service and database readiness
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: Service is ready.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, const: ok}
+        '405': {description: Only GET is supported.}
+        '503': {description: SQLite health check failed.}
+  /api/v1/agent/report:
+    post:
+      summary: Replace one Agent's complete quota and task state
+      operationId: reportAgentState
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AgentReport'}
+      responses:
+        '204': {description: Full agent state accepted.}
+        '400': {description: Invalid or unsupported report.}
+        '401': {description: Missing or invalid agent token.}
+        '403': {description: Token is bound to a different agent ID.}
+        '409': {description: Report is older than the state already stored.}
+        '413': {description: Payload exceeds 64 KiB.}
+        '429': {description: Authentication or per-token request limit exceeded.}
+        '500': {description: Report could not be stored.}
+  /api/v1/display/snapshot:
+    get:
+      summary: Read the normalized display snapshot
+      operationId: getDisplaySnapshot
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Current normalized quota and active-task summary.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DisplaySnapshot'}
+        '401': {description: Missing or invalid display token.}
+        '429': {description: Authentication or per-token request limit exceeded.}
+        '500': {description: Snapshot could not be built.}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    LimitWindow:
+      type: object
+      additionalProperties: false
+      required: [usedPercent, remainingPercent, resetsAt]
+      properties:
+        usedPercent: {type: number, minimum: 0, maximum: 100}
+        remainingPercent: {type: number, minimum: 0, maximum: 100}
+        resetsAt: {type: string, format: date-time}
+    ProviderWindows:
+      type: object
+      additionalProperties: false
+      required: [fiveHour, sevenDay]
+      properties:
+        fiveHour:
+          oneOf: [{$ref: '#/components/schemas/LimitWindow'}, {type: 'null'}]
+        sevenDay:
+          oneOf: [{$ref: '#/components/schemas/LimitWindow'}, {type: 'null'}]
+    ProviderReport:
+      type: object
+      additionalProperties: false
+      required: [observedAt, windows]
+      properties:
+        observedAt: {type: string, format: date-time}
+        authState: {type: string}
+        plan: {type: string}
+        source: {type: string}
+        errorCode: {type: string}
+        windows: {$ref: '#/components/schemas/ProviderWindows'}
+    ActiveTask:
+      type: object
+      additionalProperties: false
+      required: [provider, kind, sessionId, startedAt, lastSeenAt]
+      properties:
+        provider: {type: string, enum: [codex, claude]}
+        kind: {type: string, enum: [main, sub]}
+        sessionId: {type: string, minLength: 1, maxLength: 256}
+        startedAt: {type: string, format: date-time}
+        lastSeenAt: {type: string, format: date-time}
+    AgentReport:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, agentId, sentAt, providers, activeTasks]
+      properties:
+        schemaVersion: {type: integer, const: 1}
+        agentId: {type: string, pattern: '^[A-Za-z0-9._-]{1,64}$'}
+        sentAt: {type: string, format: date-time}
+        providers:
+          type: object
+          additionalProperties: false
+          properties:
+            codex: {$ref: '#/components/schemas/ProviderReport'}
+            claude: {$ref: '#/components/schemas/ProviderReport'}
+        activeTasks:
+          type: array
+          maxItems: 256
+          items: {$ref: '#/components/schemas/ActiveTask'}
+    ProviderSnapshot:
+      type: object
+      required: [freshness, windows]
+      properties:
+        observedAt: {type: string, format: date-time}
+        freshness: {type: string, enum: [fresh, stale, unavailable]}
+        loginRequired:
+          type: boolean
+          description: True when this provider must be logged in again before quota collection can resume.
+        plan: {type: string}
+        source: {type: string}
+        windows: {$ref: '#/components/schemas/ProviderWindows'}
+    TaskCount:
+      type: object
+      required: [main, sub]
+      properties:
+        main: {type: integer, minimum: 0}
+        sub: {type: integer, minimum: 0}
+    DisplaySnapshot:
+      type: object
+      required: [schemaVersion, generatedAt, providers, tasks, agents, warnings]
+      properties:
+        schemaVersion: {type: integer, const: 1}
+        generatedAt: {type: string, format: date-time}
+        providers:
+          type: object
+          required: [codex, claude]
+          properties:
+            codex: {$ref: '#/components/schemas/ProviderSnapshot'}
+            claude: {$ref: '#/components/schemas/ProviderSnapshot'}
+        tasks:
+          type: object
+          required: [codex, claude, total]
+          properties:
+            codex: {$ref: '#/components/schemas/TaskCount'}
+            claude: {$ref: '#/components/schemas/TaskCount'}
+            total: {$ref: '#/components/schemas/TaskCount'}
+        agents:
+          type: object
+          required: [online, total]
+          properties:
+            online: {type: integer, minimum: 0}
+            total: {type: integer, minimum: 0}
+        warnings:
+          type: array
+          description: Machine-readable provider state warnings. Authentication warnings use `<provider>_login_required`, for example `codex_login_required`.
+          items: {type: string}

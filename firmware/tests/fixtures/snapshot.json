@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-02T15:00:00Z",
+  "providers": {
+    "codex": {
+      "observedAt": "2026-08-02T14:59:58Z",
+      "freshness": "fresh",
+      "plan": "pro",
+      "windows": {
+        "fiveHour": null,
+        "sevenDay": {
+          "usedPercent": 6,
+          "remainingPercent": 94,
+          "resetsAt": "2026-08-08T00:00:00Z"
+        }
+      }
+    },
+    "claude": {
+      "observedAt": "2026-08-02T14:59:57Z",
+      "freshness": "fresh",
+      "plan": "max20",
+      "windows": {
+        "fiveHour": {
+          "usedPercent": 25,
+          "remainingPercent": 75,
+          "resetsAt": "2026-08-02T18:00:00Z"
+        },
+        "sevenDay": null
+      }
+    }
+  },
+  "tasks": {
+    "codex": {"main": 1, "sub": 2},
+    "claude": {"main": 0, "sub": 1},
+    "total": {"main": 1, "sub": 3}
+  },
+  "agents": {"online": 2, "total": 2},
+  "warnings": []
+}

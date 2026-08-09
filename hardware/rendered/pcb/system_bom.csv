@@ -1,0 +1,10 @@
+Item,Qty,Manufacturer,MPN,Description,Notes
+Controller,1,DFRobot,DFR0975,FireBeetle 2 ESP32-S3 N16R8,"Do not fit the camera; board revision V1.2+ preferred"
+Display,1,DFRobot,DFR0665,2.8in 320x240 ILI9341 GDI display,Touch and microSD unused
+Battery,1,Qualified local supplier,755060-1S-3000mAh-PROTECTED,3.7V protected LiPo with supplier-fitted JST PHR-2,"Must provide UN38.3 and IEC62133; envelope <=60x50x7.5mm; positive lead must mate to J1.1 BAT_RAW and every pack requires polarity inspection"
+FPC cable,2,DFRobot,FIT0682,18-pin 0.5mm-pitch reverse-contact GDI FPC cable 50mm,"Official GDI cable; verify both latch/contact faces during dry-fit"
+Battery harness,1,Approved harness shop,QM-HARNESS-BAT-R01,100mm PHR-2 to PHR-2 battery jumper,"Use 2x JST PHR-2 and 4x SPH-002T-P0.5S; 26AWG red/black; build and inspect only to hardware/wiring/HARNESS_SPEC.md"
+Auxiliary harness,1,Approved harness shop,QM-HARNESS-AUX-R01,Low-profile carrier-to-DFR0975 signal harness,"J5 vertical header is DNP; termination/retention remains prototype-only per hardware/wiring/HARNESS_SPEC.md"
+Carrier PCB,1,PCB fabricator,QM-CARRIER-R01,84x58mm 1.0mm 2-layer ENIG,"Verified prototype only; production blocked by hardware/pcb/PRODUCTION_STATUS.md"
+Fastener,4,Generic,M1.6x4-PT,M1.6 x 4mm thread-forming plastics screw,"For the four DFR0665 lid bosses; do not overtighten"
+Enclosure,1,Local print,QM-ENC-R01,Printed base lid two button caps and power-switch cap,"PETG preferred; physical fit not production-approved"

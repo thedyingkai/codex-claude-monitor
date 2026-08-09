@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/>
+    </marker>
+    <style>
+      .title { font: 700 28px sans-serif; fill: #0f172a; }
+      .heading { font: 700 21px sans-serif; fill: #0f172a; }
+      .body { font: 18px sans-serif; fill: #334155; }
+      .small { font: 15px sans-serif; fill: #475569; }
+      .module { fill: #eff6ff; stroke: #2563eb; stroke-width: 3; }
+      .power { fill: #fff7ed; stroke: #ea580c; stroke-width: 3; }
+      .warning { fill: #fef2f2; stroke: #dc2626; stroke-width: 2; }
+      .wire { fill: none; stroke: #2563eb; stroke-width: 5; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="720" fill="#f8fafc"/>
+  <text class="title" x="60" y="55">Quota Monitor — Keyes E32R28T 当前接线</text>
+
+  <rect class="power" x="55" y="145" width="280" height="155" rx="18"/>
+  <text class="heading" x="90" y="190">电脑 / 5V USB 电源</text>
+  <text class="body" x="90" y="230">Type-C 数据线</text>
+  <text class="small" x="90" y="265">烧录、串口、供电与充电</text>
+
+  <rect class="module" x="455" y="105" width="330" height="330" rx="20"/>
+  <text class="heading" x="510" y="155">Keyes E32R28T</text>
+  <text class="body" x="500" y="200">ESP32-32E + Wi-Fi</text>
+  <text class="body" x="500" y="235">ILI9341V 2.8&quot; TFT</text>
+  <text class="body" x="500" y="270">XPT2046 电阻触摸</text>
+  <text class="body" x="500" y="305">CH340C + 1S 充电</text>
+  <text class="small" x="500" y="355">无需独立 Wi-Fi 或自制 PCB</text>
+  <text class="small" x="500" y="390">BAT: 1.25mm 2P，按丝印核极性</text>
+
+  <rect class="power" x="870" y="145" width="275" height="155" rx="18"/>
+  <text class="heading" x="910" y="190">3.7V / 1S 锂电池</text>
+  <text class="body" x="910" y="230">保护板 + MX1.25-2P</text>
+  <text class="small" x="910" y="265">正极 → BAT+；负极 → BAT−</text>
+
+  <path class="wire" d="M335 220 H445"/>
+  <path class="wire" d="M860 220 H795"/>
+
+  <rect class="warning" x="80" y="505" width="1040" height="145" rx="16"/>
+  <text class="heading" x="120" y="550">通电前硬门禁</text>
+  <text class="body" x="120" y="590">MX1.25 只说明外形；插头能插入不等于极性正确。以实物 +/- 丝印和万用表为准。</text>
+  <text class="body" x="120" y="625">首次先只接 USB 跑通，再断 USB 核极性后插电池。禁止焊电芯极耳或用电池做反接试验。</text>
+</svg>

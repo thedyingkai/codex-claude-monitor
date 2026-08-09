@@ -1,0 +1,26 @@
+Drill report for carrier.kicad_pcb
+Created on 2026-08-02T19:51:57+0000
+
+Copper Layer Stackup:
+    =============================================================
+    L1 :  F.Cu                      front
+    L2 :  B.Cu                      back
+
+
+Drill file 'carrier-PTH.drl' contains
+    plated through holes:
+    =============================================================
+    T1  0.300mm  0.0118"  (3 holes)
+    T2  0.350mm  0.0138"  (54 holes)
+    T3  1.020mm  0.0402"  (7 holes)
+
+    Total plated holes count 64
+
+
+Drill file 'carrier-NPTH.drl' contains
+    unplated through holes:
+    =============================================================
+    T1  0.900mm  0.0354"  (6 holes)
+    T2  2.600mm  0.1024"  (4 holes)
+
+    Total unplated holes count 10

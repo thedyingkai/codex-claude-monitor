@@ -1,0 +1,15 @@
+{
+  "agentId": "desktop-01",
+  "serverUrl": "https://monitor.example.com",
+  "tokenFile": "~/.quota-monitor/agent.token",
+  "hookAddr": "127.0.0.1:47632",
+  "hookSecretFile": "~/.quota-monitor/hook-secret",
+  "codexCommand": "codex",
+  "claudeCommand": "claude",
+  "planOverrides": {},
+  "reportInterval": "15s",
+  "collectInterval": "60s",
+  "sequentialCollection": false,
+  "maxBackoff": "2m",
+  "allowInsecureHttp": false
+}

@@ -1,0 +1,89 @@
+(footprint "Murata_GRM21_Reflow_a1.10_b0.95_c0.95"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -2 0)
+		(layer "F.Fab")
+		(uuid "38aa5435-9f7b-5e86-8f98-1e2ecf1010a3")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Murata_GRM21_Reflow_a1.10_b0.95_c0.95"
+		(at 0 2 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "4b5b2464-c1d6-5c9d-a0bd-92dbbe8e7983")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "935260bb-12ae-59f1-ad85-687d0bc4294f")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "5e08fde8-4f92-53e1-84b7-7e04948d60f4")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(fp_rect
+		(start -0.625 -1)
+		(end 0.625 1)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "c8a1301c-ba4a-550c-8c59-cc57ad31f552")
+	)
+	(fp_circle
+		(center -0.275 -0.65)
+		(end -0.075 -0.65)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill yes)
+		(layer "F.Fab")
+		(uuid "0db2dd4b-39e6-5ad9-9901-d2ff7dcd3ca6")
+	)
+	(pad "1" smd rect
+		(at 0 -1.025)
+		(size 0.95 1.1)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "0d05aefe-6812-5146-825e-a8531b0c356d")
+	)
+	(pad "2" smd rect
+		(at 0 1.025)
+		(size 0.95 1.1)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "7dd3efea-1aec-55ac-b445-fa25e6d74f99")
+	)
+	(embedded_fonts no)
+)

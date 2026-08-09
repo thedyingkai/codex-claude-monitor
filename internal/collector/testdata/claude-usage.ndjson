@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init"}
+{"type":"result","metadata":{"rate_limits":{"five_hour":{"used_percentage":25,"resets_at":"2026-08-03T05:00:00Z"},"seven_day":{"used_percentage":40,"resets_at":"2026-08-09T00:00:00Z"}}}}

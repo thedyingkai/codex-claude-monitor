@@ -1,0 +1,11 @@
+*.bin binary
+*.pdf binary
+*.png binary
+*.rgb565 binary
+*.step binary
+*.stl binary
+*.woff2 binary
+
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
