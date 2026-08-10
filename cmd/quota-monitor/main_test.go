@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"codex-claude-monitor/internal/firmware"
 	"codex-claude-monitor/internal/model"
 	"codex-claude-monitor/internal/store"
 )
@@ -76,6 +77,57 @@ func TestVersionCommand(t *testing.T) {
 	}
 	if strings.TrimSpace(stdout.String()) == "" {
 		t.Fatal("version output is empty")
+	}
+}
+
+func TestFirmwarePublishCommand(t *testing.T) {
+	t.Parallel()
+	directory := t.TempDir()
+	source := filepath.Join(t.TempDir(), "firmware.bin")
+	payload := []byte("e32r28t command fixture")
+	if err := os.WriteFile(source, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{
+		"firmware", "publish",
+		"--board", "e32r28t",
+		"--version", "0.3.0",
+		"--file", source,
+		"--firmware-dir", directory,
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("firmware publish returned %d: %s", code, stderr.String())
+	}
+	var manifest firmware.Manifest
+	if err := json.Unmarshal(stdout.Bytes(), &manifest); err != nil {
+		t.Fatalf("decode command output: %v (%s)", err, stdout.String())
+	}
+	if manifest.Board != firmware.BoardE32R28T || manifest.Version != "0.3.0" || manifest.SizeBytes != int64(len(payload)) {
+		t.Fatalf("manifest = %+v", manifest)
+	}
+	loaded, err := firmware.LoadManifest(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded != manifest {
+		t.Fatalf("stored manifest = %+v; want %+v", loaded, manifest)
+	}
+}
+
+func TestFirmwarePublishCommandValidatesRequiredFlags(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{
+		{"firmware"},
+		{"firmware", "unknown"},
+		{"firmware", "publish"},
+		{"firmware", "publish", "--board", "e32r28t", "--version", "0.3.0"},
+		{"firmware", "publish", "unexpected"},
+	} {
+		var stdout, stderr bytes.Buffer
+		if code := run(args, &stdout, &stderr); code == 0 {
+			t.Errorf("run(%q) unexpectedly succeeded: %s", args, stdout.String())
+		}
 	}
 }
 

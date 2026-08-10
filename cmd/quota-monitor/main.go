@@ -25,6 +25,7 @@ import (
 
 	"codex-claude-monitor/internal/agent"
 	"codex-claude-monitor/internal/collector"
+	"codex-claude-monitor/internal/firmware"
 	"codex-claude-monitor/internal/hooks"
 	"codex-claude-monitor/internal/model"
 	"codex-claude-monitor/internal/server"
@@ -40,6 +41,10 @@ var version = "dev"
 // HTTPS report instead of reusing collectInterval, which is a scheduling knob
 // and may intentionally be much shorter than either CLI timeout.
 const agentOnceTimeout = 75 * time.Second
+
+// Firmware is streamed to a Wi-Fi display and can take longer than the JSON
+// API's normal response time on a weak connection.
+const firmwareDownloadWriteTimeout = 5 * time.Minute
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -67,6 +72,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		err = runService(args[1:], stdout, stderr)
 	case "token":
 		err = runToken(args[1:], stdout, stderr)
+	case "firmware":
+		err = runFirmware(args[1:], stdout, stderr)
 	case "doctor":
 		err = runDoctor(args[1:], stdout, stderr)
 	case "login":
@@ -458,6 +465,7 @@ func runStandalone(args []string, stdout, stderr io.Writer) error {
 	sequentialCollection := fs.Bool("sequential-collection", true, "probe Codex then Claude serially and release idle provider helpers")
 	persistInterval := fs.Duration("persist-interval", agent.DefaultReportInterval, "SQLite task heartbeat interval")
 	logFormat := fs.String("log-format", envOr("QUOTA_MONITOR_LOG_FORMAT", "text"), "json or text")
+	firmwareDir := fs.String("firmware-dir", envOr("QUOTA_MONITOR_FIRMWARE_DIR", defaultFirmwareDir()), "published E32R28T firmware directory")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -510,7 +518,7 @@ func runStandalone(args []string, stdout, stderr io.Writer) error {
 		}
 	}
 
-	api, err := server.New(server.Config{Store: database, Logger: logger})
+	api, err := server.New(server.Config{Store: database, Logger: logger, FirmwareDir: *firmwareDir})
 	if err != nil {
 		return err
 	}
@@ -523,7 +531,7 @@ func runStandalone(args []string, stdout, stderr io.Writer) error {
 		Handler:           api,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      15 * time.Second,
+		WriteTimeout:      firmwareDownloadWriteTimeout,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
 	}
@@ -857,6 +865,7 @@ Usage:
   quota-monitor hooks install|uninstall [options]
   quota-monitor service generate [options]
   quota-monitor token create|list|revoke [options]
+  quota-monitor firmware publish [options]
   quota-monitor doctor [options]
   quota-monitor login codex|claude
   quota-monitor version
@@ -879,6 +888,7 @@ func runService(args []string, stdout, stderr io.Writer) error {
 	executableDefault, _ := os.Executable()
 	executable := fs.String("executable", executableDefault, "absolute quota-monitor executable path")
 	configPath := fs.String("config", "", "absolute agent config path (agent mode only)")
+	firmwareDirectory := fs.String("firmware-dir", "", "standalone firmware directory (systemd defaults below %h)")
 	workingDirectory := fs.String("working-directory", "", "service working directory")
 	windowsUserID := fs.String("windows-user-id", "", "optional Windows user SID")
 	outputPath := fs.String("output", "", "write file instead of stdout")
@@ -904,7 +914,8 @@ func runService(args []string, stdout, stderr io.Writer) error {
 	}
 	cfg := agent.ServiceFileConfig{
 		Executable: resolvedExecutable, ConfigPath: resolvedConfig,
-		WorkingDirectory: *workingDirectory, WindowsUserID: *windowsUserID, Mode: *mode,
+		FirmwareDirectory: *firmwareDirectory, WorkingDirectory: *workingDirectory,
+		WindowsUserID: *windowsUserID, Mode: *mode,
 	}
 	var content string
 	switch strings.ToLower(*target) {
@@ -950,6 +961,7 @@ func runServer(args []string, stdout, stderr io.Writer) error {
 	listen := fs.String("listen", envOr("QUOTA_MONITOR_LISTEN", "127.0.0.1:8787"), "HTTP listen address")
 	dbPath := fs.String("db", envOr("QUOTA_MONITOR_DB", "data/monitor.db"), "SQLite database path")
 	logFormat := fs.String("log-format", envOr("QUOTA_MONITOR_LOG_FORMAT", "json"), "json or text")
+	firmwareDir := fs.String("firmware-dir", envOr("QUOTA_MONITOR_FIRMWARE_DIR", defaultFirmwareDir()), "published E32R28T firmware directory")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -979,7 +991,7 @@ func runServer(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("unsupported log format %q", *logFormat)
 	}
 	logger := slog.New(handler)
-	api, err := server.New(server.Config{Store: database, Logger: logger})
+	api, err := server.New(server.Config{Store: database, Logger: logger, FirmwareDir: *firmwareDir})
 	if err != nil {
 		return err
 	}
@@ -989,7 +1001,7 @@ func runServer(args []string, stdout, stderr io.Writer) error {
 		Handler:           api,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      15 * time.Second,
+		WriteTimeout:      firmwareDownloadWriteTimeout,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
 	}
@@ -1018,6 +1030,46 @@ func runServer(args []string, stdout, stderr io.Writer) error {
 		}
 		return err
 	}
+}
+
+func runFirmware(args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 || args[0] != "publish" {
+		return errors.New("firmware requires publish")
+	}
+	fs := flag.NewFlagSet("firmware publish", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	board := fs.String("board", "", "target board (e32r28t)")
+	firmwareVersion := fs.String("version", "", "strict MAJOR.MINOR.PATCH version")
+	filePath := fs.String("file", "", "local firmware .bin file")
+	firmwareDir := fs.String("firmware-dir", envOr("QUOTA_MONITOR_FIRMWARE_DIR", defaultFirmwareDir()), "server firmware directory")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return errors.New("firmware publish accepts no positional arguments")
+	}
+	if strings.TrimSpace(*board) == "" || strings.TrimSpace(*firmwareVersion) == "" || strings.TrimSpace(*filePath) == "" {
+		return errors.New("firmware publish requires --board, --version, and --file")
+	}
+	manifest, err := firmware.Publish(context.Background(), firmware.PublishOptions{
+		Directory:  *firmwareDir,
+		Board:      *board,
+		Version:    *firmwareVersion,
+		SourcePath: *filePath,
+	})
+	if err != nil {
+		return err
+	}
+	encoder := json.NewEncoder(stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(manifest)
+}
+
+func defaultFirmwareDir() string {
+	if runtime.GOOS == "linux" {
+		return "/var/lib/quota-monitor/firmware"
+	}
+	return filepath.Join("data", "firmware")
 }
 
 func runToken(args []string, stdout, stderr io.Writer) error {

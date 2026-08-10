@@ -100,6 +100,19 @@ curl --fail --show-error https://monitor.example.com/healthz
 
 正常响应是 `{"status":"ok"}`。Caddy 自动申请证书；首次启动失败时先核对 DNS、系统时间、80/443 入站规则和 Caddy 的外网连通性。Compose 不把 `8787` 发布到宿主机。
 
+Compose 把数据库和 `/data/firmware` 一起保存在 `monitor-data` 卷中。构建 E32R28T
+固件并通过容量门槛后，可用一次性容器在同一数据卷原子发布，服务无需重启：
+
+```sh
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml run --rm --no-deps \
+  -v "$PWD/firmware/.pio/build/e32r28t/firmware.bin:/tmp/firmware.bin:ro" \
+  monitor firmware publish --firmware-dir /data/firmware \
+  --board e32r28t --version 0.3.0 --file /tmp/firmware.bin
+```
+
+Windows 应把 `-v` 左侧换成 `firmware.bin` 的绝对路径。不要通过 Caddy/nginx 增加上传
+路径；公网固件接口只读并继续使用显示令牌。
+
 ## 3. 创建令牌
 
 令牌没有远程管理 API，只能由能够访问 SQLite 文件的服务器管理员创建。Docker 部署中应在正在运行的 `monitor` 容器内调用完整程序路径：
@@ -336,13 +349,20 @@ set base_url https://monitor.example.com
 set token qmon_REPLACE_WITH_DISPLAY_TOKEN
 set timezone CST-8
 set refresh_seconds 15
+set brightness_percent 60
+set dim_after_seconds 60
+set screen_off_after_seconds 300
+set screen_off_refresh_seconds 60
 save
 test
 ```
 
 `base_url` 也可包含完整 `/api/v1/display/snapshot` 路径；固件会避免重复追加。`refresh_seconds` 范围是 5–3600 秒，默认 15 秒。`show` 会遮蔽密码和令牌；`save` 前的修改只在内存中，必须执行 `save` 才会写入 NVS。`factory-reset` 会清空 Wi-Fi/API 配置并重启，无法恢复。
 
-运行时可短按板上 BOOT 键立即刷新、长按查看网络诊断。触摸屏左半边等同 A 键（短按刷新、长按诊断），右半边等同 B 键（短按循环亮度、长按设备信息）。E32R28T 没有旧方案的独立电源拨杆和第二实体按键，因此恢复出厂配置以串口 `factory-reset` 为准。
+运行时可短按板上 BOOT 键立即刷新，按住 1.2–5 秒查看诊断，持续 5 秒打开手机
+配网页。亮屏时触摸任意位置都会刷新，长按左/右半屏分别显示网络诊断/设备信息；
+熄屏后的第一次触摸会立即恢复亮度并刷新。E32R28T 没有旧方案的独立电源拨杆和
+第二实体按键，因此恢复出厂配置以串口 `factory-reset` 为准。
 
 确认 USB 下屏幕、触摸和串口均正常后，拔掉 Type-C 并核对电池极性，再插入带保护板的 3.7V/1S、MX1.25-2P 成品电池。不要热插时强推插头，不要焊电芯极耳。完整步骤见[硬件装配说明](hardware/assembly.md)。
 
@@ -350,7 +370,16 @@ test
 所有必填对象和计数字段、额度百分比合计、RFC3339 重置/观测时间以及 Agent 汇总
 关系；未知扩展字段会忽略。API/Wi-Fi 失败时保留缓存值；最近的规范化快照也会
 限频写入 NVS，所以离线重启后仍可显示，并按服务器 `generatedAt` 的真实年龄
-标为过期。固件同时拒绝未来时间和重放/回滚快照。当前串口配置没有门户网页。
+标为过期。固件同时拒绝未来时间和重放/回滚快照。
+
+v0.3.0 没有有效配置时会自动创建临时 WPA2 热点；已有配置时可长按 BOOT 5 秒或
+串口输入 `portal`。手机连接屏幕显示的 `QMON-XXXXXX` 和随机密码，再访问
+`http://192.168.4.1`。页面只在热点侧开放，10 分钟无操作后关闭。新配置全部通过
+Wi-Fi、NTP、TLS、令牌和快照测试后才会写入 NVS。
+
+首次启用手机配网和 OTA 仍需通过 USB 烧录 v0.3.0。以后可在临时配网页查看服务器
+发布的更高版本，并在连接稳定 USB 电源后手动确认安装；设备从不自动升级。服务器
+发布命令、哈希校验和自动回滚步骤见[手机配网与安全 OTA](firmware-ota.md)。
 
 仅在首次实机联调且尚无域名时，可构建 `e32r28t_dev`。这个单独目标只额外接受
 `10.0.0.0/8`、`172.16.0.0/12` 或 `192.168.0.0/16` 内的 HTTP 地址；它不会接受

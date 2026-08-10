@@ -10,6 +10,7 @@
 gofmt -l ./cmd ./internal
 go test -race ./...
 go vet ./...
+npx --yes @redocly/cli@1.34.5 lint api/openapi.yaml
 ```
 
 `gofmt -l` 应没有输出。Windows 环境若 Go race detector 不可用，至少运行 `go test ./...`，并在 Linux CI 上补跑 race 测试。
@@ -177,6 +178,18 @@ python3 -m venv .tools/pio-venv
 python firmware/scripts/check_snapshot_fixture.py
 ```
 
+E32R28T 的 OTA 槽为 1,966,080 字节，发布门禁还要求至少保留 128 KiB。Linux/macOS
+可用与 CI 相同的检查：
+
+```sh
+firmware_bin=firmware/.pio/build/e32r28t/firmware.bin
+size_bytes=$(stat -c '%s' "$firmware_bin")
+slot_bytes=1966080
+headroom_bytes=$((slot_bytes - size_bytes))
+test "$size_bytes" -lt "$slot_bytes"
+test "$headroom_bytes" -ge 131072
+```
+
 Windows PowerShell 使用 `.\.tools\pio-venv\Scripts\pio.exe` 替换上述 `pio` 路径。
 
 目标板构建成功只证明编译与链接。烧录后还应验证：
@@ -188,9 +201,32 @@ Windows PowerShell 使用 `.\.tools\pio-venv\Scripts\pio.exe` 替换上述 `pio`
   快照并标为过期，网络恢复后自动刷新；
 - 服务器证书错误必须失败，不能静默降级；
 - NVS 损坏/恢复、串口 `show/set/test/save/factory-reset` 与秘密遮蔽；
-- E32R28T 的 BOOT 短按/长按、左右触摸区短按/长按、三档亮度和串口
+- `AWAKE/DIMMED/BACKLIGHT_OFF/PORTAL/OTA` 阈值、禁用值、`millis()` 回卷、亮度恢复、
+  熄屏刷新不点亮、触摸唤醒并刷新以及 1 秒请求合并；
+- 同步 HTTPS 已移出 LVGL 主循环；在十秒请求超时期间触摸仍应在 200 ms 内亮屏；
+- E32R28T 的 BOOT 短按/1.2–5 秒/5 秒长按、左右触摸区长按、三档亮度和串口
   `factory-reset`；BOOT 在复位时保持低电平会进入下载模式，不能当作开机复位组合键；
 - 正常情况下额度变化 90 秒内到屏，任务变化 30 秒内到屏。
+
+## 手机配网与 OTA 验收
+
+配网页至少覆盖：无配置自动开启、BOOT/串口手动开启、十分钟超时、单客户端、Wi-Fi
+扫描和手工 SSID、错误密码、NTP/DNS/TLS/401/JSON 失败、旧配置完整回退、保存中
+断电恢复、空秘密保留旧值、恶意 SSID 转义、CSRF、超过 2 KiB 的 POST，以及从 STA
+地址访问被拒绝。测试日志不得出现密码、Bearer 令牌或请求正文。
+
+OTA 服务器/设备端到端至少覆盖：
+
+- 无令牌、错误作用域、未发布 404、损坏发布 503、错误板型、同版本和降级版本；
+- 超过非活动槽、截断文件、错误 Content-Length/SHA-256、下载断线、写入失败和重定向；
+- manifest 只允许严格三段式版本且无外部 URL，下载必须和快照 API 同源；
+- 连接稳定 USB 电源复选框未勾选时拒绝安装，服务器永不自动推送；
+- 成功升级后 30 秒自检再标记有效；自检期崩溃/重启自动回滚，原固件和 NVS 可用；
+- `firmware publish` 原子更新、文件权限 0600，发布不重启服务；nginx/Caddy 流式传输；
+- 服务重启后 manifest/文件继续可用，未知服务器 JSON 字段不会破坏旧客户端。
+
+真机测试要分别记录常亮、10% 降亮和背光关闭三态电流，并明确背光关闭不是整机关机。
+OTA 断电测试必须在可恢复的 USB/串口条件下进行，不能连接存在安全疑问的锂电池。
 
 烧录与真机测试需记录 PlatformIO 平台/库版本、固件 Git 修订、开发板批次与屏幕批次。
 
@@ -228,6 +264,7 @@ Windows PowerShell 使用 `.\.tools\pio-venv\Scripts\pio.exe` 替换上述 `pio`
 - [ ] Hooks 重复安装/卸载及原配置恢复通过；
 - [ ] Windows 登录任务与 Linux `systemd --user` 重启恢复通过；
 - [ ] E32R28T 与旧目标均编译，E32 烧录、触摸、断网/TLS/NVS/按键测试通过；
+- [ ] E32 固件小于 1,966,080 字节并保留至少 128 KiB，手机配网与 OTA/自动回滚通过；
 - [ ] E32R28T、电池、MX1.25 极性、绝缘和外壳 3D/实物干涉复核通过；
 - [ ] 充电温升、三档亮度功耗、续航与整机尺寸/重量实测通过；
 - [ ] 真实域名、DNS、80/443、备份和令牌撤销演练通过。

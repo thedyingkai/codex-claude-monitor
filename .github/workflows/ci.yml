@@ -16,12 +16,13 @@ jobs:
         with:
           go-version: '1.23.x'
           cache: true
-      - run: test -z "$(gofmt -l ./cmd ./internal)"
+      - run: test -z "$(gofmt -l $(find cmd internal -type f -name '*.go'))"
       - run: go test -race ./...
       - run: go vet ./...
       - run: npx --yes @redocly/cli@1.34.5 lint api/openapi.yaml
       - run: |
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /tmp/quota-monitor.exe ./cmd/quota-monitor
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/quota-monitor-linux-amd64 ./cmd/quota-monitor
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /tmp/quota-monitor-arm64 ./cmd/quota-monitor
 
   firmware:
@@ -32,7 +33,24 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r firmware/requirements.txt
-      - run: pio test -d firmware -e native
+      - name: Run native firmware tests
+        run: pio test -d firmware -e native
       - name: Install non-production device CA fixture
         run: cp firmware/certs/device-root-ca.example.pem firmware/certs/device-root-ca.pem
-      - run: pio run -d firmware -e firebeetle2_esp32s3 -j 1
+      - name: Build E32R28T production firmware
+        run: pio run -d firmware -e e32r28t -j 1
+      - name: Enforce E32R28T OTA slot and headroom
+        shell: bash
+        run: |
+          set -euo pipefail
+          firmware_bin=firmware/.pio/build/e32r28t/firmware.bin
+          slot_bytes=1966080
+          required_headroom=131072
+          size_bytes=$(stat -c '%s' "$firmware_bin")
+          headroom_bytes=$((slot_bytes - size_bytes))
+          printf 'E32R28T firmware: %d bytes; OTA slot: %d bytes; headroom: %d bytes\n' \
+            "$size_bytes" "$slot_bytes" "$headroom_bytes"
+          test "$size_bytes" -lt "$slot_bytes"
+          test "$headroom_bytes" -ge "$required_headroom"
+      - name: Build legacy FireBeetle regression target
+        run: pio run -d firmware -e firebeetle2_esp32s3 -j 1

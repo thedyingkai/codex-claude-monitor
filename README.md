@@ -15,6 +15,7 @@
 - `quota-monitor server` + `quota-monitor agent`：兼容多机上报模式，适合确实需要统计多台电脑任务的场景。
 - `quota-monitor hooks install/uninstall`：合并 Codex/Claude 用户配置、保留原 Hooks 和 Claude status line，并支持精确卸载。
 - `quota-monitor token create/list/revoke`：在服务器本地管理 `agent:write` 和 `display:read` 令牌。
+- `quota-monitor firmware publish`：在服务器本地校验并原子发布 E32R28T OTA 固件；公网没有上传接口。
 - `deploy/`：Standalone 的用户级 systemd/Caddy 示例，以及兼容模式的 Docker Compose 部署。
 - `firmware/`：PlatformIO + Arduino ESP32 + LVGL 固件；默认目标为 Keyes 62520093 E32R28T，旧 FireBeetle 目标仍可回归构建。
 - `hardware/`：E32R28T 当前接线/BOM，以及已明确标记为停用的旧 DFRobot 载板和外壳资料。
@@ -36,6 +37,7 @@ Standalone 会直接把云端采集结果写入同一进程打开的 SQLite，�
 3. 安装 Hooks，并用 `systemd --user` 常驻运行 `quota-monitor standalone`。
 4. 用宿主机 Caddy 把回环地址 `127.0.0.1:8787` 代理到 HTTPS 域名。
 5. 把 Standalone 首次创建的 `display.token` 写入 ESP32。
+6. 首次用 USB 烧录 v0.3.0；此后可从设备的临时 WPA2 配网页手动确认 OTA。
 
 完整命令和服务文件见 [Standalone 云端部署](docs/standalone.md)。原来的 Docker server + 本地 Agent 流程仍保留在[快速开始](docs/quickstart.md)中，作为多机兼容方案。
 
@@ -46,6 +48,7 @@ Standalone 会直接把云端采集结果写入同一进程打开的 SQLite，�
 - [快速开始与首次部署](docs/quickstart.md)
 - [Standalone 单进程云端部署](docs/standalone.md)
 - [运行维护、升级、备份与故障排查](docs/operations.md)
+- [E32R28T 手机配网、熄屏与安全 OTA](docs/firmware-ota.md)
 - [测试与验收清单](docs/testing.md)
 - [R0.1 自动验证报告](docs/verification-report.md)
 - [系统架构](docs/architecture.md)
@@ -60,8 +63,11 @@ Standalone 会直接把云端采集结果写入同一进程打开的 SQLite，�
 - `GET /healthz`：无需令牌，仅表示服务与数据库可用。
 - `POST /api/v1/agent/report`：多机 Agent 兼容接口，需要与 `agentId` 绑定的 `agent:write` Bearer 令牌；Standalone 自身不经过此接口。
 - `GET /api/v1/display/snapshot`：需要 `display:read` Bearer 令牌。
+- `GET /api/v1/display/firmware/e32r28t/manifest`：需要同一只读令牌，返回当前发布版本、大小和 SHA-256。
+- `GET /api/v1/display/firmware/e32r28t/{version}.bin`：需要同一只读令牌，流式下载当前发布固件。
 
-服务不开放 CORS、管理页面或远程令牌管理接口。单次 Agent 上报上限为 64 KiB；
+服务不开放 CORS、管理页面、固件上传或远程令牌管理接口。设备配网页只存在于临时
+WPA2 热点的 `192.168.4.1`，不会从正常 Wi-Fi 或云服务器开放。单次 Agent 上报上限为 64 KiB；
 默认每个有效令牌每分钟最多 120 次请求，令牌校验前另有哈希指纹限速、全局上限
 和并发上限。
 

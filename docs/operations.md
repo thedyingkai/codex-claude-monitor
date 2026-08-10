@@ -166,7 +166,11 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml start monitor
 
 ## 升级与回滚
 
-升级前备份 SQLite 和用户 Hooks 配置。Go 服务与 Agent 应使用同一个 `schemaVersion: 1` 契约版本。
+升级前备份 SQLite、显示令牌、当前二进制、quota-monitor 专用 systemd/反向代理配置
+和 TLS 文件，并生成 SHA-256 清单。Standalone 运行中的 SQLite 应使用 Python
+`sqlite3.Connection.backup` 做一致在线副本，不能只复制 WAL 模式下的主数据库；
+完整命令见 [Standalone 文档](standalone.md#备份发布固件与升级)。不要复制或改动
+Codex/Claude OAuth 目录。Go 服务与 Agent 应使用同一个 `schemaVersion: 1` 契约版本。
 
 Docker 服务：
 
@@ -176,9 +180,37 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d monitor
 curl --fail https://monitor.example.com/healthz
 ```
 
-Agent 二进制应在停止服务后替换，再重新启动。若二进制路径改变，运行 `hooks install --executable <新绝对路径>` 以更新 Hooks。回滚时恢复旧二进制；只有数据库格式不兼容时才恢复数据库备份。
+Standalone 升级应把新二进制安装到同目录临时文件，验证版本后原子替换，然后只短暂
+重启 quota-monitor。代理配置先执行 `nginx -t` 或 `caddy validate`，通过后只 reload
+对应代理。Hysteria 和其他无关服务不得停止、重启或 reload。升级后逐项验证原快照、
+Codex 采集、firmware manifest、证书续期计时器和升级前记录的所有无关服务状态。
+若二进制路径改变，运行 `hooks install --executable <新绝对路径>` 更新 Hooks。回滚时
+恢复旧二进制和代理配置；只有数据库格式确实不兼容时才恢复数据库备份。
 
-ESP32 升级固件前记录 `show` 输出（其中密码和令牌已脱敏）。常规刷写不应清除 NVS，但仍需准备显示令牌以便重新配置。
+ESP32 首次升级到 v0.3.0 前应读取并校验完整 4 MiB Flash 备份；它包含 Wi-Fi 密码和
+显示令牌，只能保留在被 Git 忽略的本机目录。此后 OTA 只在临时配网页人工确认，必须
+接稳定 USB 电源。新版本在 30 秒本地自检成功前不会标记有效，崩溃或重启会由双分区
+Bootloader 回滚。常规 USB 写入应用分区不应清除 NVS；整片擦除或写入从 `0x0` 开始
+的合并镜像会清除配置。详细恢复流程见[手机配网与安全 OTA](firmware-ota.md)。
+
+## OTA 发布与故障排查
+
+固件发布只允许在服务器本地执行，不存在公网 POST/上传接口：
+
+```sh
+quota-monitor firmware publish \
+  --firmware-dir /var/lib/quota-monitor/firmware \
+  --board e32r28t --version 0.3.0 \
+  --file /安全暂存目录/firmware.bin
+```
+
+发布成功后不需要重启服务。用只读显示令牌验证 manifest，但不要把令牌直接写入 shell
+历史或日志。manifest 404 表示尚未发布；503 表示 manifest 或对应文件损坏，应停止
+安装、核对权限/长度/SHA-256 后发布更高版本，不能临时关闭哈希或 TLS 校验。
+
+设备页面显示下载或写入失败时，原运行分区应保持可启动。依次核对 HTTPS 证书、令牌
+作用域、manifest 板型/版本/大小、反向代理是否缓冲或超时、服务器文件 SHA-256 和
+OTA 分区余量。设备拒绝同版本、降级版本、重定向和不同源下载是预期安全行为。
 
 ## 常见故障
 

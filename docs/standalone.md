@@ -51,6 +51,7 @@ go build -trimpath -o quota-monitor ./cmd/quota-monitor
 install -d -m 700 \
   "$HOME/.local/bin" \
   "$HOME/.local/share/quota-monitor" \
+  "$HOME/.local/share/quota-monitor/firmware" \
   "$HOME/.quota-monitor" \
   "$HOME/.config/systemd/user"
 install -m 755 ./quota-monitor "$HOME/.local/bin/quota-monitor"
@@ -106,6 +107,7 @@ Hooks 接收器只监听 `127.0.0.1:47632`，不需要在云防火墙开放这�
   --db="$HOME/.local/share/quota-monitor/monitor.db" \
   --display-token-file="$HOME/.local/share/quota-monitor/display.token" \
   --hook-secret-file="$HOME/.quota-monitor/hook-secret" \
+  --firmware-dir="$HOME/.local/share/quota-monitor/firmware" \
   --claude=false \
   --sequential-collection=true \
   --log-format=text
@@ -118,6 +120,7 @@ Hooks 接收器只监听 `127.0.0.1:47632`，不需要在云防火墙开放这�
 - `monitor.db`：SQLite 数据库；
 - `display.token`：ESP32 使用的只读 Bearer 令牌；
 - `hook-secret`：本机 Hooks 共享密钥。
+- `firmware/`：管理员本地发布并由 OTA GET 接口流式读取的固件目录。
 
 这些文件权限会限制为当前用户。`display.token` 中的 `qmon_...` 需要复制到 ESP32，但不要提交到 Git、截图或发到聊天记录。数据库和令牌文件必须配套保存；令牌文件与数据库不匹配时，程序会拒绝启动，而不是悄悄创建一个无法使用的新令牌。
 
@@ -179,6 +182,9 @@ curl --fail --show-error https://monitor.example.com/healthz
 ```
 
 生产版 ESP32 固件必须使用受信任证书的 HTTPS，不能直接连接明文 8787。
+如果改用 nginx，只公开健康检查、显示快照和两个固件 GET 路径，并让其他路径返回
+404；可从 [nginx 示例](../deploy/nginx-display-endpoint.conf.example)开始配置。固件
+下载必须关闭代理缓冲并设置足够的读取超时。
 
 ## 验证显示 API
 
@@ -231,19 +237,58 @@ journalctl --user -u quota-monitor-standalone.service -f
 
 如果 Codex/Claude 只在本地电脑使用，而本地不运行 Agent，云端任务数保持 0 是正常结果。Standalone 不会扫描远程会话，也没有账号级任务列表接口。
 
-## 备份与升级
+## 备份、发布固件与升级
 
-SQLite 使用 WAL。备份前先停止服务，再同时保存数据库和令牌文件：
+SQLite 使用 WAL，不能在服务运行时只复制 `monitor.db`。使用 Python 标准库的 online
+backup API 可以不停服务获得一致副本：
 
 ```sh
-systemctl --user stop quota-monitor-standalone.service
-cp "$HOME/.local/share/quota-monitor/monitor.db" /安全备份目录/
-cp "$HOME/.local/share/quota-monitor/display.token" /安全备份目录/
-cp "$HOME/.quota-monitor/hook-secret" /安全备份目录/
-systemctl --user start quota-monitor-standalone.service
+umask 077
+BACKUP_DIR="$HOME/qmon-backups/$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 700 "$BACKUP_DIR"
+python3 - "$HOME/.local/share/quota-monitor/monitor.db" \
+  "$BACKUP_DIR/monitor.db" <<'PY'
+import sqlite3, sys
+source = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+target = sqlite3.connect(sys.argv[2])
+with target:
+    source.backup(target)
+result = target.execute("PRAGMA integrity_check").fetchone()[0]
+source.close()
+target.close()
+if result != "ok":
+    raise SystemExit(f"backup integrity_check failed: {result}")
+PY
+install -m 600 "$HOME/.local/share/quota-monitor/display.token" "$BACKUP_DIR/"
+install -m 755 "$HOME/.local/bin/quota-monitor" "$BACKUP_DIR/"
+install -m 600 "$HOME/.config/systemd/user/quota-monitor-standalone.service" "$BACKUP_DIR/"
+(cd "$BACKUP_DIR" && sha256sum ./* > SHA256SUMS && sha256sum -c SHA256SUMS)
+unset BACKUP_DIR
 ```
 
-升级时先备份，再替换 `~/.local/bin/quota-monitor`，随后重启用户服务。若可执行文件路径发生变化，需要重新运行 `hooks install --executable ...`，让 Hook 配置指向新路径。
+生产部署还应由管理员把当前 quota-monitor 专用反向代理配置及其证书/私钥复制到同一个
+`0700` 备份目录，并重新生成 `SHA256SUMS`。不要复制 `$HOME/.codex`、
+`$HOME/.claude` 或其他 OAuth 目录。备份包含可用显示令牌和 TLS 私钥，只能留在受控
+服务器或加密离线介质，不能提交 Git、截图或发送到聊天。
+
+发布固件前先构建 `e32r28t` 并确认镜像小于 1,966,080 字节且至少余留 128 KiB：
+
+```sh
+quota-monitor firmware publish \
+  --firmware-dir "$HOME/.local/share/quota-monitor/firmware" \
+  --board e32r28t --version 0.3.0 \
+  --file firmware/.pio/build/e32r28t/firmware.bin
+```
+
+发布会原子替换 manifest，不需要重启服务或 reload 反向代理。设备只会在临时配网页
+检查更新，并且必须人工确认安装。详情见[手机配网与安全 OTA](firmware-ota.md)。
+
+升级服务器程序时先验证上述备份，再把新二进制安装到同目录的临时文件，校验版本后
+原子 `mv` 覆盖，随后只重启 quota-monitor。先执行 `caddy validate` 或 `nginx -t`，
+代理配置通过后只 reload 对应代理。不得停止、重启或 reload Hysteria 及其他无关服务。
+替换后验证 `/healthz`、显示快照、firmware manifest 和原有业务服务状态；失败时恢复
+旧二进制和原代理配置。若可执行文件路径发生变化，需要重新运行
+`hooks install --executable ...`，让 Hook 配置指向新路径。
 
 卸载 Hooks 使用：
 

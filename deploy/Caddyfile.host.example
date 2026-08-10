@@ -20,5 +20,18 @@ monitor.example.com {
 		Cache-Control "no-store"
 	}
 
-	reverse_proxy 127.0.0.1:8787
+	@firmware path /api/v1/display/firmware/e32r28t/manifest /api/v1/display/firmware/e32r28t/*.bin
+	handle @firmware {
+		# Stream OTA images instead of waiting for the complete response.
+		reverse_proxy 127.0.0.1:8787 {
+			flush_interval -1
+			transport http {
+				read_timeout 5m
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8787
+	}
 }

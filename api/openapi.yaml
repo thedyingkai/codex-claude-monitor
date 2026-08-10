@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Codex Claude Quota Monitor API
-  version: 1.0.0
-  description: Read-only display snapshots and authenticated full-state agent reports.
+  version: 1.1.0
+  description: Read-only display snapshots and firmware downloads, plus authenticated full-state agent reports.
   license:
     name: MIT
     identifier: MIT
@@ -64,12 +64,92 @@ paths:
         '401': {description: Missing or invalid display token.}
         '429': {description: Authentication or per-token request limit exceeded.}
         '500': {description: Snapshot could not be built.}
+  /api/v1/display/firmware/e32r28t/manifest:
+    get:
+      summary: Read the current E32R28T firmware manifest
+      description: >-
+        Returns metadata for the firmware currently published by the server.
+        The display constructs the binary URL on the same origin; the manifest
+        deliberately contains no download URL.
+      operationId: getE32R28TFirmwareManifest
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Current E32R28T firmware metadata.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FirmwareManifest'}
+        '401': {description: Missing or invalid display token.}
+        '404': {description: No E32R28T firmware has been published.}
+        '429': {description: Authentication or per-token request limit exceeded.}
+        '503': {description: Published manifest or firmware image failed server-side validation.}
+  /api/v1/display/firmware/e32r28t/{version}.bin:
+    get:
+      summary: Download one published E32R28T firmware image
+      description: >-
+        Streams the exact image referenced by the current manifest. Historical
+        or orphaned files in the firmware directory are not exposed. Redirects
+        are not part of this contract; the display must reject them.
+      operationId: downloadE32R28TFirmware
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: version
+          in: path
+          required: true
+          description: Strict three-part semantic version without a leading v.
+          schema: {$ref: '#/components/schemas/FirmwareVersion'}
+      responses:
+        '200':
+          description: Raw ESP32 application image.
+          headers:
+            Content-Length:
+              description: Exact firmware size in bytes.
+              schema: {type: integer, minimum: 1}
+            X-Content-Type-Options:
+              description: Always `nosniff`.
+              schema: {type: string, const: nosniff}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '401': {description: Missing or invalid display token.}
+        '404': {description: Version is malformed or is not the current published firmware.}
+        '429': {description: Authentication or per-token request limit exceeded.}
+        '503': {description: Published manifest or firmware image failed server-side validation.}
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
   schemas:
+    FirmwareVersion:
+      type: string
+      pattern: '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+      maxLength: 32
+      description: Three canonical decimal components, each in the unsigned 32-bit range.
+      examples: ['0.3.0']
+    FirmwareManifest:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, board, version, publishedAt, sizeBytes, sha256]
+      properties:
+        schemaVersion: {type: integer, const: 1}
+        board: {type: string, const: e32r28t}
+        version: {$ref: '#/components/schemas/FirmwareVersion'}
+        publishedAt: {type: string, format: date-time}
+        sizeBytes:
+          type: integer
+          minimum: 1
+          maximum: 1966080
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+      examples:
+        - schemaVersion: 1
+          board: e32r28t
+          version: 0.3.0
+          publishedAt: '2026-08-09T08:00:00Z'
+          sizeBytes: 1377328
+          sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     LimitWindow:
       type: object
       additionalProperties: false

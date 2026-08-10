@@ -7,6 +7,9 @@
 `min_spiffs.csv` 双 1.875MB 应用分区；没有 PSRAM。不要套用 ESP32-S3 的
 16MB/PSRAM/USB-CDC 参数。
 
+E32R28T 的每个应用分区为 1,966,080 字节。CI 要求 `firmware.bin` 小于该值且至少
+保留 131,072 字节余量，也就是发布镜像不得超过 1,835,008 字节。
+
 ```powershell
 Set-Location C:\path\to\codex-claude-monitor\firmware
 pio test -e native
@@ -51,14 +54,19 @@ set base_url https://quota.example.com
 set token DISPLAY_READ_TOKEN
 set timezone CST-8
 set refresh_seconds 15
+set brightness_percent 60
+set dim_after_seconds 60
+set screen_off_after_seconds 300
+set screen_off_refresh_seconds 60
 save
 test
+portal
 factory-reset
 ```
 
 `set` 先暂存在内存，`save` 验证后写入 NVS。`show` 会遮蔽 Wi-Fi 密码和令牌。
-E32R28T 没有第二实体键，也没有可靠的 MCU USB 插入检测；为避免 BOOT 低电平导致
-下载模式，恢复出厂配置以串口 `factory-reset` 为准。
+`portal` 会打开十分钟的临时 WPA2 配网页。E32R28T 没有第二实体键，也没有可靠的
+MCU USB 插入检测；恢复出厂配置仍以串口 `factory-reset` 为准。
 
 厂家横屏示例的默认触摸校准为 `495,3398,721,3448`。如果实购屏偏移，可运行厂家
 资料包的 `Touch_Calibrate` 示例获得新值，再暂存并保存：
@@ -81,9 +89,10 @@ GPIO34 位于 ADC1，Wi-Fi 工作时仍可使用。固件每 5 秒取 9 个校�
 时和无电池而充电节点悬空时，电压百分比都可能偏差；必须和万用表对比，不把它当
 精密电量计。低于 20% 标红，ADC 无效显示 `N/A`。
 
-E32R28T 没有旧方案的 AP22804 显示负载开关、USB sense 或电源拨杆。GPIO21 PWM
-只能调暗/关闭背光，不能切断 ESP32 和充电电路。首版因此保持常开，不启用未经实测
-的深睡/触摸唤醒；需要真正关机时应增加经验证的独立电源方案。
+E32R28T 没有旧方案的 AP22804 显示负载开关、USB sense 或电源拨杆。v0.3.0 默认
+60 秒无操作降到 10% 亮度、300 秒关闭 GPIO21 背光；触摸、ESP32 和 Wi-Fi 继续
+工作，第一次触摸会亮屏并刷新。它不启用深度睡眠，因此背光关闭不是整机关机。
+需要真正关机时应增加经验证的独立电源方案。
 
 ## 数据与故障显示
 
@@ -100,3 +109,6 @@ E32R28T 没有旧方案的 AP22804 显示负载开关、USB sense 或电源拨�
 - 某窗口缺失时显示 `N/A`；服务器数据超过 90 秒时显示黄色过期状态。
 - TLS 使用内置 ISRG Root X1，不调用 `setInsecure()`；DNS/TLS/API 和 Wi-Fi 失败
   均指数退避到 60 秒并保留缓存值。
+
+首次启用配网页与 OTA 必须通过 USB 烧录 v0.3.0；后续版本才可从临时热点手动升级。
+完整操作、安全边界和回滚步骤见[手机配网与安全 OTA](../firmware-ota.md)。
