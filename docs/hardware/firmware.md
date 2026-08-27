@@ -50,6 +50,8 @@ LCD 使用 TFT_eSPI/VSPI，触摸使用单独的 HSPI 和固定提交版本的 M
 show
 set ssid VALUE
 set password VALUE
+set ssid2 OPTIONAL_BACKUP_VALUE
+set password2 OPTIONAL_BACKUP_VALUE
 set base_url https://quota.example.com
 set token DISPLAY_READ_TOKEN
 set timezone CST-8
@@ -64,7 +66,9 @@ portal
 factory-reset
 ```
 
-`set` 先暂存在内存，`save` 验证后写入 NVS。`show` 会遮蔽 Wi-Fi 密码和令牌。
+`ssid/password` 是主网络，`ssid2/password2` 是可选备用网络。两组 SSID 不能相同；
+主网络不可为空。固件会在两组网络间自动切换，并优先重试本次运行中最后连接成功的
+一组。`set` 先暂存在内存，`save` 验证后写入 NVS。`show` 会遮蔽两个 Wi-Fi 密码和令牌。
 `portal` 会打开十分钟的临时 WPA2 配网页。E32R28T 没有第二实体键，也没有可靠的
 MCU USB 插入检测；恢复出厂配置仍以串口 `factory-reset` 为准。
 
@@ -106,7 +110,8 @@ E32R28T 没有旧方案的 AP22804 显示负载开关、USB sense 或电源拨�
   百分比关系；未知扩展字段忽略。
 - 设备先通过 NTP 获得可信时间，拒绝未来超过 120 秒及不晚于上次接收时间的快照。
   最近规范化快照限频写入 NVS，离线重启后仍可显示并标为过期。
-- 某窗口缺失时显示 `N/A`；服务器数据超过 90 秒时显示黄色过期状态。
+- 某窗口缺失时显示 `N/A`；服务器数据超过 90 秒时显示灰色过期状态，避免与
+  Claude 的橙黄色额度强调色混淆。离线时仍保留红色 Wi-Fi 图标作为连接故障提示。
 - TLS 使用内置 ISRG Root X1，不调用 `setInsecure()`；DNS/TLS/API 和 Wi-Fi 失败
   均指数退避到 60 秒并保留缓存值。
 

@@ -333,9 +333,22 @@ func unixTimestamp(value int64) time.Time {
 }
 
 var (
-	ansiPattern      = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
-	percentPattern   = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*%\s*(?:used)?`)
-	timestampPattern = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})`)
+	ansiPattern          = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
+	percentPattern       = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*%\s*(?:used)?`)
+	timestampPattern     = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})`)
+	resetPhrasePattern   = regexp.MustCompile(`(?i)\bresets?\s+(.+?)\s*$`)
+	relativeResetPattern = regexp.MustCompile(`(?i)^in\s+(.+?)\s*$`)
+	relativeResetPart    = regexp.MustCompile(`(?i)(\d+)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)`)
+	absoluteResetPattern = regexp.MustCompile(`(?i)^([a-z]+)\s+(\d{1,2})(?:,\s*(\d{4}))?(?:,\s*|\s+at\s+)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s*\(([^)]+)\))?$`)
+	currentWeekHeading   = regexp.MustCompile(`(?i)^\s*current\s+week(?:\s*\(([^)]*)\))?(?:\s*:|\s*$)`)
+	modelOnlyHeading     = regexp.MustCompile(`(?i)^\s*[^:]{1,80}\bonly(?:\s*:|\s*$)`)
+	fiveHourHeading      = regexp.MustCompile(`(?i)^\s*(?:current\s+session|5h|5\s*hours?|5-hour)(?:\s+(?:limit|usage))?(?:\s*:|\s*$)`)
+	sevenDayHeading      = regexp.MustCompile(`(?i)^\s*(?:all\s+models|7d|7\s*days?|7-day|weekly\s+limits?)(?:\s*:|\s*$)`)
+)
+
+const (
+	claudeResetPastTolerance = 24 * time.Hour
+	claudeResetMaxHorizon    = 8 * 24 * time.Hour
 )
 
 func stripANSI(value string) string { return ansiPattern.ReplaceAllString(value, "") }
@@ -362,22 +375,14 @@ func parseClaudeUsageText(text string, observedAt time.Time) (model.ProviderRepo
 	}
 	for _, line := range strings.Split(text, "\n") {
 		lower := strings.ToLower(line)
-		switch {
-		case strings.Contains(lower, "current session") || strings.Contains(lower, "5h") || strings.Contains(lower, "5 hour") || strings.Contains(lower, "5-hour"):
+		if kind, isHeading := classifyClaudeUsageHeading(line); isHeading {
 			commit()
-			pending = pendingWindow{kind: "five"}
-		case strings.Contains(lower, "sonnet only") || strings.Contains(lower, "opus only"):
-			commit()
-			pending = pendingWindow{}
-		case strings.Contains(lower, "current week (all models)") || strings.Contains(lower, "7d") || strings.Contains(lower, "7 day") || strings.Contains(lower, "7-day") || strings.Contains(lower, "weekly limit"):
-			commit()
-			pending = pendingWindow{kind: "seven"}
+			pending = pendingWindow{kind: kind}
 		}
 		if pending.kind == "" {
 			continue
 		}
 		percentage := percentPattern.FindStringSubmatch(line)
-		stamp := timestampPattern.FindString(line)
 		if len(percentage) >= 2 {
 			used, _ := strconv.ParseFloat(percentage[1], 64)
 			if strings.Contains(lower, "remaining") && !strings.Contains(lower, "used") {
@@ -385,11 +390,8 @@ func parseClaudeUsageText(text string, observedAt time.Time) (model.ProviderRepo
 			}
 			pending.used = &used
 		}
-		if stamp != "" {
-			reset, err := time.Parse(time.RFC3339, stamp)
-			if err == nil {
-				pending.reset = &reset
-			}
+		if reset, ok := parseClaudeUsageReset(line, observedAt); ok {
+			pending.reset = &reset
 		}
 	}
 	commit()
@@ -397,6 +399,203 @@ func parseClaudeUsageText(text string, observedAt time.Time) (model.ProviderRepo
 		return model.ProviderReport{}, errors.New("Claude /usage did not contain structured quota windows")
 	}
 	return report, nil
+}
+
+// classifyClaudeUsageHeading recognizes only headings at the start of a line.
+// In particular, quota reset values such as "Resets in 5h" and "2d5h" must
+// never be mistaken for a five-hour heading. Any model-specific current-week
+// heading is a boundary, but only the all-models window is displayed.
+func classifyClaudeUsageHeading(line string) (string, bool) {
+	if match := currentWeekHeading.FindStringSubmatch(line); len(match) == 2 {
+		label := strings.Join(strings.Fields(match[1]), " ")
+		if strings.EqualFold(label, "all models") {
+			return "seven", true
+		}
+		return "", true
+	}
+	if modelOnlyHeading.MatchString(line) {
+		return "", true
+	}
+	if fiveHourHeading.MatchString(line) {
+		return "five", true
+	}
+	if sevenDayHeading.MatchString(line) {
+		return "seven", true
+	}
+	return "", false
+}
+
+// parseClaudeUsageReset accepts both the older machine-shaped timestamp and
+// the human-readable reset strings emitted by current Claude Code /usage.
+// Current headless output wraps text such as these in the JSON result field:
+//
+//	resets Aug 25, 8:09am (UTC)
+//	resets Jun 22 at 8:10pm (Asia/Tokyo)
+//
+// The interactive usage panel can instead render a relative value such as
+// "resets in 17h6m", so that form is accepted as well. The parser remains
+// deliberately English-only because the collector launches Claude with
+// NO_COLOR and current Claude Code emits these labels in English.
+func parseClaudeUsageReset(line string, observedAt time.Time) (time.Time, bool) {
+	match := resetPhrasePattern.FindStringSubmatch(strings.TrimSpace(line))
+	if len(match) != 2 {
+		return time.Time{}, false
+	}
+	value := strings.TrimSpace(match[1])
+	if stamp := timestampPattern.FindString(value); stamp != "" {
+		parsed, err := time.Parse(time.RFC3339, stamp)
+		if err != nil || !validClaudeResetHorizon(parsed, observedAt) {
+			return time.Time{}, false
+		}
+		return parsed.UTC(), true
+	}
+	if parsed, ok := parseClaudeRelativeReset(value, observedAt); ok {
+		return parsed, validClaudeResetHorizon(parsed, observedAt)
+	}
+	return parseClaudeAbsoluteReset(value, observedAt)
+}
+
+func parseClaudeRelativeReset(value string, observedAt time.Time) (time.Time, bool) {
+	match := relativeResetPattern.FindStringSubmatch(strings.TrimSpace(value))
+	if len(match) != 2 {
+		return time.Time{}, false
+	}
+	parts := relativeResetPart.FindAllStringSubmatch(match[1], -1)
+	if len(parts) == 0 {
+		return time.Time{}, false
+	}
+	remainder := relativeResetPart.ReplaceAllString(match[1], "")
+	remainder = strings.ReplaceAll(strings.ToLower(remainder), "and", "")
+	if strings.Trim(remainder, " \t,·") != "" {
+		return time.Time{}, false
+	}
+
+	var duration time.Duration
+	for _, part := range parts {
+		amount, err := strconv.ParseInt(part[1], 10, 64)
+		if err != nil {
+			return time.Time{}, false
+		}
+		var unit time.Duration
+		switch strings.ToLower(part[2]) {
+		case "d", "day", "days":
+			unit = 24 * time.Hour
+		case "h", "hr", "hrs", "hour", "hours":
+			unit = time.Hour
+		case "m", "min", "mins", "minute", "minutes":
+			unit = time.Minute
+		case "s", "sec", "secs", "second", "seconds":
+			unit = time.Second
+		default:
+			return time.Time{}, false
+		}
+		// Claude's supported quota windows reset within seven days. Reject
+		// implausible input before multiplying to avoid duration overflow.
+		if amount > int64((8*24*time.Hour)/unit) {
+			return time.Time{}, false
+		}
+		duration += time.Duration(amount) * unit
+		if duration > 8*24*time.Hour {
+			return time.Time{}, false
+		}
+	}
+	return observedAt.Add(duration).UTC(), true
+}
+
+func parseClaudeAbsoluteReset(value string, observedAt time.Time) (time.Time, bool) {
+	match := absoluteResetPattern.FindStringSubmatch(strings.TrimSpace(value))
+	if len(match) != 8 {
+		return time.Time{}, false
+	}
+	month, ok := englishMonth(match[1])
+	if !ok {
+		return time.Time{}, false
+	}
+	day, dayErr := strconv.Atoi(match[2])
+	hour, hourErr := strconv.Atoi(match[4])
+	minute := 0
+	var minuteErr error
+	if match[5] != "" {
+		minute, minuteErr = strconv.Atoi(match[5])
+	}
+	if dayErr != nil || hourErr != nil || minuteErr != nil || day < 1 || day > 31 || minute < 0 || minute > 59 {
+		return time.Time{}, false
+	}
+	meridiem := strings.ToLower(match[6])
+	if meridiem != "" {
+		if hour < 1 || hour > 12 {
+			return time.Time{}, false
+		}
+		if hour == 12 {
+			hour = 0
+		}
+		if meridiem == "pm" {
+			hour += 12
+		}
+	} else if hour < 0 || hour > 23 {
+		return time.Time{}, false
+	}
+
+	location := observedAt.Location()
+	if zoneName := strings.TrimSpace(match[7]); zoneName != "" {
+		var err error
+		location, err = time.LoadLocation(zoneName)
+		if err != nil {
+			return time.Time{}, false
+		}
+	}
+	localObserved := observedAt.In(location)
+	explicitYear := match[3] != ""
+	if explicitYear {
+		year, err := strconv.Atoi(match[3])
+		if err != nil {
+			return time.Time{}, false
+		}
+		parsed, ok := buildClaudeAbsoluteReset(year, month, day, hour, minute, location)
+		if !ok || !validClaudeResetHorizon(parsed, observedAt) {
+			return time.Time{}, false
+		}
+		return parsed.UTC(), true
+	}
+
+	// The CLI normally omits the year. Considering the adjacent years handles
+	// both directions of the boundary: late December -> early January and a
+	// briefly stale December value observed just after New Year. At most one
+	// candidate can fall inside a quota window-sized horizon.
+	for _, year := range []int{localObserved.Year() - 1, localObserved.Year(), localObserved.Year() + 1} {
+		parsed, ok := buildClaudeAbsoluteReset(year, month, day, hour, minute, location)
+		if ok && validClaudeResetHorizon(parsed, observedAt) {
+			return parsed.UTC(), true
+		}
+	}
+	return time.Time{}, false
+}
+
+func buildClaudeAbsoluteReset(year int, month time.Month, day, hour, minute int, location *time.Location) (time.Time, bool) {
+	parsed := time.Date(year, month, day, hour, minute, 0, 0, location)
+	local := parsed.In(location)
+	// time.Date normalizes invalid dates and daylight-saving gaps. Reject them
+	// instead of silently storing a different day or wall-clock reset time.
+	if local.Year() != year || local.Month() != month || local.Day() != day || local.Hour() != hour || local.Minute() != minute {
+		return time.Time{}, false
+	}
+	return parsed, true
+}
+
+func validClaudeResetHorizon(reset, observedAt time.Time) bool {
+	delta := reset.Sub(observedAt)
+	return delta >= -claudeResetPastTolerance && delta <= claudeResetMaxHorizon
+}
+
+func englishMonth(value string) (time.Month, bool) {
+	lower := strings.ToLower(strings.TrimSpace(value))
+	for month := time.January; month <= time.December; month++ {
+		name := strings.ToLower(month.String())
+		if lower == name || lower == name[:3] {
+			return month, true
+		}
+	}
+	return 0, false
 }
 
 // MergeProviderReports prefers newer observations but fills omitted windows

@@ -345,6 +345,8 @@ python3 -m venv .tools/pio-venv
 show
 set ssid YourWiFiName
 set password YourWiFiPassword
+set ssid2 OptionalBackupWiFi
+set password2 OptionalBackupPassword
 set base_url https://monitor.example.com
 set token qmon_REPLACE_WITH_DISPLAY_TOKEN
 set timezone CST-8
@@ -357,7 +359,12 @@ save
 test
 ```
 
-`base_url` 也可包含完整 `/api/v1/display/snapshot` 路径；固件会避免重复追加。`refresh_seconds` 范围是 5–3600 秒，默认 15 秒。`show` 会遮蔽密码和令牌；`save` 前的修改只在内存中，必须执行 `save` 才会写入 NVS。`factory-reset` 会清空 Wi-Fi/API 配置并重启，无法恢复。
+`ssid/password` 是必需的主网络；`ssid2/password2` 是 v0.3.1 起可选的备用网络，
+不需要备用时可省略。两组 SSID 不能相同。设备连接失败时会自动轮换，并在本次运行
+期间优先重试最后成功的网络。`base_url` 也可包含完整 `/api/v1/display/snapshot`
+路径；固件会避免重复追加。`refresh_seconds` 范围是 5–3600 秒，默认 15 秒。`show`
+会遮蔽两个 Wi-Fi 密码和令牌；`save` 前的修改只在内存中，必须执行 `save` 才会写入
+NVS。`factory-reset` 会清空 Wi-Fi/API 配置并重启，无法恢复。
 
 运行时可短按板上 BOOT 键立即刷新，按住 1.2–5 秒查看诊断，持续 5 秒打开手机
 配网页。亮屏时触摸任意位置都会刷新，长按左/右半屏分别显示网络诊断/设备信息；

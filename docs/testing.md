@@ -18,7 +18,7 @@ npx --yes @redocly/cli@1.34.5 lint api/openapi.yaml
 当前单元/集成测试覆盖的主要行为包括：
 
 - Codex app-server 初始化、RPC 调用、断线重连、超时、300/10080 分钟窗口映射与未知窗口；
-- Claude `/usage` NDJSON/渲染文本、statusLine 结构、缺失窗口、未登录命令返回非零但 stdout 有效；
+- Claude `/usage` NDJSON/渲染文本、Claude Code 2.1.220 的英文绝对重置时间、`resets in 17h6m` 相对时间、跨年日期、statusLine 结构、缺失窗口、未登录命令返回非零但 stdout 有效；
 - 明确断言 Claude 采集命令只有 `-p /usage`，并带无会话持久化和探测标记；
 - Hooks 事件最小化、回环限制、共享密钥、探测排除、重复安装、卸载恢复和损坏配置拒绝；
 - 主任务/子任务生命周期、心跳、无 ID 的子任务结束与 15 分钟孤儿失效；
@@ -135,7 +135,7 @@ quota-monitor agent --config /absolute/path/to/agent.json --once
 验收项目：
 
 - `/usage` 是本地 slash command；采集器没有添加第二段普通提示词；
-- stream-json 中真实 Pro/Max 5h/7d 字段能被解析，缺失窗口保持 `null`；
+- stream-json 中真实 Pro/Max 5h/7d 数据能被解析；当前版本可能不提供结构化 `rate_limits`，而把 `Current session`、`Current week (all models)` 和人类可读重置时间放在 `result` 文本中，缺失窗口仍应保持 `null`；
 - API 的 used/remaining 百分比和重置时间与 CLI 显示一致；
 - 开启常驻 Agent 并进入 Claude 交互会话后，statusLine 数据能更新/回退；
 - 原 status line 的 stdout 仍显示，失败不会阻断 Claude；

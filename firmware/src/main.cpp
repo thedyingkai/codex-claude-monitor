@@ -39,6 +39,7 @@
 #include "SnapshotParser.h"
 #include "ResponseBuffer.h"
 #include "RuntimePolicy.h"
+#include "WifiFailoverPolicy.h"
 #include "pins.h"
 #include "OtaPolicy.h"
 #include "version.h"
@@ -142,6 +143,8 @@ void keyes_ili9341_post_init(TFT_eSPI& display) {
 struct DeviceConfig {
   String ssid;
   String password;
+  String ssid2;
+  String password2;
   String base_url;
   String token;
   String timezone = "CST-8";
@@ -220,8 +223,6 @@ std::int64_t last_accepted_generated_epoch = 0;
 std::int64_t last_persisted_generated_epoch = 0;
 uint32_t next_fetch_ms = 0;
 uint32_t api_backoff_ms = 1000;
-uint32_t next_wifi_attempt_ms = 0;
-uint32_t wifi_backoff_ms = 1000;
 uint32_t message_until_ms = 0;
 const uint8_t brightness_percent[] = {30, 60, 100};
 String serial_line;
@@ -239,6 +240,7 @@ bool cached_battery_ok = false;
 uint32_t next_battery_sample_ms = 0;
 
 quota_monitor::DisplayStateMachine display_state;
+quota_monitor::WifiFailoverPolicy wifi_failover_policy;
 quota_monitor::DisplayState applied_display_state =
     quota_monitor::DisplayState::kAwake;
 quota_monitor::RefreshGate manual_refresh_gate;
@@ -483,6 +485,8 @@ bool read_config_slot(uint8_t slot, DeviceConfig& value) {
   if (valid) {
     value.ssid = slot_preferences.getString("ssid", "");
     value.password = slot_preferences.getString("password", "");
+    value.ssid2 = slot_preferences.getString("ssid2", "");
+    value.password2 = slot_preferences.getString("password2", "");
     value.base_url = slot_preferences.getString("base_url", "");
     value.token = slot_preferences.getString("token", "");
     value.timezone = slot_preferences.getString("timezone", "CST-8");
@@ -527,6 +531,10 @@ bool write_config_slot(uint8_t slot, const DeviceConfig& value) {
   ok &= slot_preferences.putString("ssid", value.ssid) == value.ssid.length();
   ok &= slot_preferences.putString("password", value.password) ==
         value.password.length();
+  ok &= slot_preferences.putString("ssid2", value.ssid2) ==
+        value.ssid2.length();
+  ok &= slot_preferences.putString("password2", value.password2) ==
+        value.password2.length();
   ok &= slot_preferences.putString("base_url", value.base_url) ==
         value.base_url.length();
   ok &= slot_preferences.putString("token", value.token) == value.token.length();
@@ -592,6 +600,8 @@ void load_config() {
     // first successful dual-slot commit, providing an additional fallback.
     config.ssid = preferences.getString("ssid", "");
     config.password = preferences.getString("password", "");
+    config.ssid2 = preferences.getString("ssid2", "");
+    config.password2 = preferences.getString("password2", "");
     config.base_url = preferences.getString("base_url", "");
     config.token = preferences.getString("token", "");
     config.timezone = preferences.getString("timezone", "CST-8");
@@ -802,7 +812,9 @@ lv_obj_t* make_card(lv_obj_t* parent, const char* title, uint32_t accent,
   lv_obj_set_style_radius(card, 10, 0);
   lv_obj_set_style_pad_all(card, 7, 0);
   lv_obj_set_style_bg_color(card, lv_color_hex(0x0c1b35), 0);
-  lv_obj_set_style_bg_opa(card, static_cast<lv_opa_t>(210), 0);
+  // Keep the same navy card color and geometry, but suppress more of the
+  // detailed background image so 16 px glyph edges stay distinct on the LCD.
+  lv_obj_set_style_bg_opa(card, static_cast<lv_opa_t>(235), 0);
   lv_obj_set_style_border_color(card, lv_color_hex(accent), 0);
   lv_obj_set_style_border_opa(card, static_cast<lv_opa_t>(205), 0);
   lv_obj_set_style_border_width(card, 1, 0);
@@ -888,7 +900,7 @@ void create_ui() {
   lv_obj_set_style_radius(topbar, 0, 0);
   lv_obj_set_style_pad_all(topbar, 0, 0);
   lv_obj_set_style_bg_color(topbar, lv_color_hex(0x061126), 0);
-  lv_obj_set_style_bg_opa(topbar, static_cast<lv_opa_t>(185), 0);
+  lv_obj_set_style_bg_opa(topbar, static_cast<lv_opa_t>(225), 0);
   lv_obj_set_style_border_width(topbar, 0, 0);
 
   const int wifi_sizes[] = {24, 17, 10};
@@ -997,7 +1009,7 @@ String local_reset_time(std::int64_t epoch) {
 
 void set_bar(lv_obj_t* label, lv_obj_t* bar,
              const quota_monitor::RateWindow& window, const char* name,
-             bool stale, uint32_t accent) {
+             bool degraded, uint32_t accent) {
   if (!window.present) {
     const std::string reset_line = quota_monitor::format_reset_line("--");
     lv_label_set_text_fmt(label, "%s  N/A\n%s", name, reset_line.c_str());
@@ -1017,10 +1029,10 @@ void set_bar(lv_obj_t* label, lv_obj_t* bar,
   lv_label_set_text_fmt(label, "%s  剩%d%%\n%s", name, remaining,
                         reset_line.c_str());
   lv_bar_set_value(bar, remaining, LV_ANIM_OFF);
-  const uint32_t text_color = stale ? 0xfef3c7
-                                    : (remaining < 20 ? 0xffd0d0 : 0xffffff);
+  const uint32_t text_color =
+      degraded ? 0xe2e8f0 : (remaining < 20 ? 0xffd0d0 : 0xffffff);
   const uint32_t bar_color =
-      stale ? 0xf59e0b : (remaining < 20 ? 0xef4444 : accent);
+      degraded ? 0x64748b : (remaining < 20 ? 0xef4444 : accent);
   lv_obj_set_style_text_color(label, lv_color_hex(text_color), 0);
   lv_obj_set_style_bg_color(bar, lv_color_hex(bar_color), LV_PART_INDICATOR);
 }
@@ -1081,12 +1093,13 @@ void set_provider(lv_obj_t* title, const char* provider_name,
   lv_label_set_text(status, state);
   const uint32_t status_color = login_required ? 0xfca5a5
                                  : unavailable ? 0xcbd5e1
-                                 : stale     ? 0xfde68a
+                                 : stale     ? 0xcbd5e1
                                              : 0x86efac;
   lv_obj_set_style_text_color(status, lv_color_hex(status_color), 0);
   const uint32_t accent = codex_provider ? kCodexAccent : kClaudeAccent;
-  set_bar(five_label, five_bar, provider.five_hour, "5小时", stale, accent);
-  set_bar(seven_label, seven_bar, provider.seven_day, "7天", stale, accent);
+  const bool degraded = unavailable || stale;
+  set_bar(five_label, five_bar, provider.five_hour, "5小时", degraded, accent);
+  set_bar(seven_label, seven_bar, provider.seven_day, "7天", degraded, accent);
 }
 
 bool clock_is_sane() {
@@ -1139,7 +1152,7 @@ void refresh_ui() {
     const bool snapshot_stale = !clock_is_sane() || age > kStaleAfterSeconds;
     lv_label_set_text_fmt(age_label, "%llds%s", static_cast<long long>(age),
                            snapshot_stale ? "!" : "");
-    const uint32_t age_color = snapshot_stale ? 0xfbbf24 : 0xdbeafe;
+    const uint32_t age_color = snapshot_stale ? 0x94a3b8 : 0xdbeafe;
     lv_obj_set_style_text_color(age_label, lv_color_hex(age_color), 0);
     lv_obj_set_style_border_color(clock_face, lv_color_hex(age_color), 0);
     set_provider(codex_title_label, "CODEX", codex_status_label,
@@ -1209,6 +1222,10 @@ bool is_private_lan_http_url(const String& url) {
 bool config_ready(const DeviceConfig& candidate, String& why) {
   if (candidate.ssid.isEmpty()) {
     why = "SSID missing";
+    return false;
+  }
+  if (!candidate.ssid2.isEmpty() && candidate.ssid2 == candidate.ssid) {
+    why = "backup SSID duplicates primary";
     return false;
   }
   const bool https_url = candidate.base_url.startsWith("https://");
@@ -1412,8 +1429,10 @@ bool fetch_snapshot(String& error) {
 }
 
 void request_wifi_now() {
-  next_wifi_attempt_ms = 0;
-  wifi_backoff_ms = 1000;
+  const DeviceConfig current_config = copy_config();
+  wifi_failover_policy.configure(!current_config.ssid.isEmpty(),
+                                 !current_config.ssid2.isEmpty());
+  wifi_failover_policy.manual_reset(millis());
   WiFi.disconnect();
 }
 
@@ -1425,18 +1444,40 @@ void service_wifi() {
     current_config = config;
     network_reserved = candidate_test_in_flight || ota_status.installing;
   }
-  if (network_reserved || network_config_dirty) return;
-  if (WiFi.status() == WL_CONNECTED) {
-    wifi_backoff_ms = 1000;
-    return;
+  if (portal_active || network_reserved || network_config_dirty) return;
+
+  wifi_failover_policy.configure(!current_config.ssid.isEmpty(),
+                                 !current_config.ssid2.isEmpty());
+  const bool connected = WiFi.status() == WL_CONNECTED;
+  if (connected) {
+    const String connected_ssid = WiFi.SSID();
+    if (connected_ssid == current_config.ssid) {
+      wifi_failover_policy.note_connected(
+          quota_monitor::WifiProfile::kPrimary);
+    } else if (!current_config.ssid2.isEmpty() &&
+               connected_ssid == current_config.ssid2) {
+      wifi_failover_policy.note_connected(
+          quota_monitor::WifiProfile::kBackup);
+    }
   }
-  if (current_config.ssid.isEmpty() ||
-      static_cast<int32_t>(millis() - next_wifi_attempt_ms) < 0)
-    return;
-  WiFi.disconnect();
-  WiFi.begin(current_config.ssid.c_str(), current_config.password.c_str());
-  next_wifi_attempt_ms = millis() + wifi_backoff_ms;
-  wifi_backoff_ms = std::min(wifi_backoff_ms * 2UL, 60000UL);
+
+  const quota_monitor::WifiFailoverDecision decision =
+      wifi_failover_policy.update(millis(), connected);
+  if (decision.action == quota_monitor::WifiFailoverAction::kStartProfile) {
+    const bool use_backup =
+        decision.profile == quota_monitor::WifiProfile::kBackup;
+    const String& ssid = use_backup ? current_config.ssid2 : current_config.ssid;
+    const String& password =
+        use_backup ? current_config.password2 : current_config.password;
+    WiFi.disconnect(false, false);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid.c_str(), password.c_str());
+  } else if (decision.action ==
+             quota_monitor::WifiFailoverAction::kRoundFailed) {
+    // Stop the final timed-out association while the pure policy observes the
+    // whole-round backoff. The display and cached quota data remain usable.
+    WiFi.disconnect(false, false);
+  }
 }
 
 bool queue_network_job(NetworkJob job) {
@@ -1535,14 +1576,14 @@ const char kPortalPage[] PROGMEM = R"HTML(<!doctype html>
 <title>QMON 配置</title><style>
 body{font-family:system-ui,sans-serif;background:#071225;color:#f8fafc;margin:0;padding:18px}main{max-width:620px;margin:auto}fieldset{border:1px solid #28527a;border-radius:12px;margin:12px 0;padding:14px;background:#0c1b35}label{display:block;margin:9px 0 4px}input,select,button{box-sizing:border-box;width:100%;padding:10px;border-radius:8px;border:1px solid #52779c;background:#102746;color:#fff}button{background:#1677d2;font-weight:700;margin-top:12px}button:disabled{opacity:.5}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.muted{color:#a9bfd7;font-size:.9em}.ok{color:#86efac}.bad{color:#fca5a5}@media(max-width:520px){.row{grid-template-columns:1fr}}</style></head>
 <body><main><h1>QMON 配置</h1><p id="device" class="muted">正在读取设备…</p>
-<fieldset><legend>Wi-Fi 与服务器</legend><label>扫描到的 Wi-Fi</label><select id="scan"><option>正在扫描…</option></select><label>SSID</label><input id="ssid" maxlength="32" autocomplete="off"><label>Wi-Fi 密码</label><input id="password" type="password" maxlength="64" placeholder="留空保留原密码"><label>HTTPS 服务器地址</label><input id="base_url" maxlength="255"><label>显示令牌</label><input id="token" type="password" maxlength="256" placeholder="留空保留原令牌"><label>时区</label><input id="timezone" maxlength="64" value="CST-8"><label>正常刷新（秒）</label><input id="refresh_seconds" type="number" min="5" max="3600"></fieldset>
+<fieldset><legend>Wi-Fi 与服务器</legend><label>扫描到的 Wi-Fi</label><select id="scan"><option>正在扫描…</option></select><label>主 Wi-Fi 名称</label><input id="ssid" maxlength="32" autocomplete="off"><label>主 Wi-Fi 密码</label><input id="password" type="password" maxlength="64" placeholder="留空保留原密码"><label>备用 Wi-Fi 名称（可选）</label><input id="ssid2" maxlength="32" autocomplete="off"><label>备用 Wi-Fi 密码</label><input id="password2" type="password" maxlength="64" placeholder="留空保留原密码"><label>HTTPS 服务器地址</label><input id="base_url" maxlength="255"><label>显示令牌</label><input id="token" type="password" maxlength="256" placeholder="留空保留原令牌"><label>时区</label><input id="timezone" maxlength="64" value="CST-8"><label>正常刷新（秒）</label><input id="refresh_seconds" type="number" min="5" max="3600"></fieldset>
 <fieldset><legend>屏幕</legend><label>正常亮度</label><select id="brightness_percent"><option>30</option><option>60</option><option>100</option></select><div class="row"><div><label>降亮时间（秒，0 禁用）</label><input id="dim_after_seconds" type="number" min="0" max="86400"></div><div><label>熄屏时间（秒，0 禁用）</label><input id="screen_off_after_seconds" type="number" min="0" max="86400"></div></div><label>熄屏刷新（秒）</label><input id="screen_off_refresh_seconds" type="number" min="60" max="3600"><button id="save">测试并保存</button><p id="configStatus" class="muted"></p></fieldset>
 <fieldset><legend>无线升级</legend><p id="ota" class="muted">正在检查…</p><label><input id="usb" type="checkbox" style="width:auto"> 已连接稳定 USB 电源</label><button id="install" disabled>确认安装升级</button><p id="otaProgress" class="muted"></p></fieldset></main>
 <script>
 let csrf='';const $=id=>document.getElementById(id);async function j(url,opt){const r=await fetch(url,opt);const x=await r.json();if(!r.ok)throw Error(x.error||r.status);return x}
-async function status(){try{const s=await j('/api/status');csrf=s.csrf||csrf;$('device').textContent=`固件 ${s.firmware} · ${s.ip||'未联网'}`;for(const k of ['ssid','base_url','timezone','refresh_seconds','brightness_percent','dim_after_seconds','screen_off_after_seconds','screen_off_refresh_seconds'])if(s[k]!==undefined)$(k).value=s[k]}catch(e){$('device').textContent=e.message}}
+async function status(){try{const s=await j('/api/status');csrf=s.csrf||csrf;$('device').textContent=`固件 ${s.firmware} · ${s.ip||'未联网'}`;for(const k of ['ssid','ssid2','base_url','timezone','refresh_seconds','brightness_percent','dim_after_seconds','screen_off_after_seconds','screen_off_refresh_seconds'])if(s[k]!==undefined)$(k).value=s[k]}catch(e){$('device').textContent=e.message}}
 async function wifi(){try{const w=await j('/api/wifi');$('scan').innerHTML='<option value="">手动输入</option>'+w.networks.map(n=>`<option value="${n.ssid.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;')}">${n.ssid} (${n.rssi} dBm)</option>`).join('');$('scan').onchange=()=>{if($('scan').value)$('ssid').value=$('scan').value}}catch(e){setTimeout(wifi,1500)}}
-$('save').onclick=async()=>{const body={};for(const k of ['ssid','password','base_url','token','timezone'])body[k]=$(k).value;for(const k of ['refresh_seconds','brightness_percent','dim_after_seconds','screen_off_after_seconds','screen_off_refresh_seconds'])body[k]=Number($(k).value);try{await j('/api/config',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(body)});$('configStatus').textContent='正在测试 Wi-Fi、时间和服务器…'}catch(e){$('configStatus').textContent=e.message}}
+$('save').onclick=async()=>{const body={};for(const k of ['ssid','password','ssid2','password2','base_url','token','timezone'])body[k]=$(k).value;for(const k of ['refresh_seconds','brightness_percent','dim_after_seconds','screen_off_after_seconds','screen_off_refresh_seconds'])body[k]=Number($(k).value);try{await j('/api/config',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(body)});$('configStatus').textContent='正在测试 Wi-Fi、时间和服务器…'}catch(e){$('configStatus').textContent=e.message}}
 async function cfg(){try{const c=await j('/api/config/status');$('configStatus').textContent=c.status+(c.error?': '+c.error:'')}catch(e){}setTimeout(cfg,1000)}
 async function ota(){try{const o=await j('/api/ota/status');$('ota').textContent=`当前 ${o.currentVersion} · 最新 ${o.latestVersion||'--'}${o.error?' · '+o.error:''}`;$('install').disabled=!o.updateAvailable||o.installing;$('otaProgress').textContent=o.installing?`升级中 ${o.progressPercent}%`:o.status}catch(e){}setTimeout(ota,1200)}
 $('install').onclick=async()=>{if(!$('usb').checked)return alert('请先确认稳定 USB 电源');if(!confirm('安装后设备会重启，继续？'))return;try{await j('/api/ota/install',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({confirmUsbPower:true})})}catch(e){alert(e.message)}};
@@ -1569,6 +1610,7 @@ void register_portal_handlers() {
     body["board"] = kFirmwareBoard;
     body["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
     body["ssid"] = current_config.ssid;
+    body["ssid2"] = current_config.ssid2;
     body["base_url"] = current_config.base_url;
     body["timezone"] = current_config.timezone;
     body["refresh_seconds"] = current_config.refresh_seconds;
@@ -1578,6 +1620,7 @@ void register_portal_handlers() {
     body["screen_off_refresh_seconds"] =
         current_config.screen_off_refresh_seconds;
     body["passwordConfigured"] = !current_config.password.isEmpty();
+    body["password2Configured"] = !current_config.password2.isEmpty();
     body["tokenConfigured"] = !current_config.token.isEmpty();
     if (portal_session_valid()) body["csrf"] = portal_csrf;
     send_portal_json(200, body);
@@ -1611,7 +1654,8 @@ void register_portal_handlers() {
                          "{\"error\":\"invalid_json\"}");
       return;
     }
-    DeviceConfig candidate = copy_config();
+    const DeviceConfig original = copy_config();
+    DeviceConfig candidate = original;
     const auto assign_string = [&input](const char* key, String& target,
                                         size_t maximum, bool blank_keeps) {
       if (!input[key].is<const char*>()) return true;
@@ -1621,10 +1665,30 @@ void register_portal_handlers() {
       return true;
     };
     bool valid = assign_string("ssid", candidate.ssid, 32, false) &&
-                 assign_string("password", candidate.password, 64, true) &&
+                 assign_string("ssid2", candidate.ssid2, 32, false) &&
                  assign_string("base_url", candidate.base_url, 255, false) &&
                  assign_string("token", candidate.token, 256, true) &&
                  assign_string("timezone", candidate.timezone, 64, false);
+    const auto assign_password = [&input](const char* key,
+                                          const String& old_ssid,
+                                          const String& new_ssid,
+                                          String& target) {
+      if (!input[key].is<const char*>()) return true;
+      const String value = input[key].as<String>();
+      if (value.length() > 64) return false;
+      if (!value.isEmpty()) {
+        target = value;
+      } else if (new_ssid != old_ssid || new_ssid.isEmpty()) {
+        // Blank only means "keep" for the same SSID. Never reuse a stored
+        // password after the corresponding network name has changed.
+        target = "";
+      }
+      return true;
+    };
+    valid &= assign_password("password", original.ssid, candidate.ssid,
+                             candidate.password);
+    valid &= assign_password("password2", original.ssid2, candidate.ssid2,
+                             candidate.password2);
     if (!valid || candidate.timezone.isEmpty()) {
       add_portal_security_headers();
       portal_server.send(400, "application/json",
@@ -1878,10 +1942,27 @@ void worker_test_candidate() {
   previous = config;
   if (shared_mutex != nullptr) xSemaphoreGive(shared_mutex);
 
+  const String previously_connected_ssid =
+      WiFi.status() == WL_CONNECTED ? WiFi.SSID() : "";
+  const bool primary_changed = candidate.ssid != previous.ssid ||
+                               candidate.password != previous.password;
+  const bool backup_changed = candidate.ssid2 != previous.ssid2 ||
+                              candidate.password2 != previous.password2;
+  bool test_backup = !primary_changed && backup_changed &&
+                     !candidate.ssid2.isEmpty();
+  if (!primary_changed && !backup_changed &&
+      previously_connected_ssid == candidate.ssid2 &&
+      !candidate.ssid2.isEmpty()) {
+    test_backup = true;
+  }
+  const String& candidate_ssid = test_backup ? candidate.ssid2 : candidate.ssid;
+  const String& candidate_password =
+      test_backup ? candidate.password2 : candidate.password;
+
   String error;
   WiFi.disconnect(false, false);
   WiFi.mode(WIFI_AP_STA);
-  WiFi.begin(candidate.ssid.c_str(), candidate.password.c_str());
+  WiFi.begin(candidate_ssid.c_str(), candidate_password.c_str());
   const uint32_t wifi_deadline = millis() + 20000U;
   while (WiFi.status() != WL_CONNECTED &&
          static_cast<int32_t>(millis() - wifi_deadline) < 0)
@@ -1915,7 +1996,13 @@ void worker_test_candidate() {
     configTzTime(previous.timezone.c_str(), "pool.ntp.org",
                  "time.cloudflare.com");
     WiFi.disconnect(false, false);
-    WiFi.begin(previous.ssid.c_str(), previous.password.c_str());
+    const bool restore_backup = !previous.ssid2.isEmpty() &&
+                                previously_connected_ssid == previous.ssid2;
+    const String& restore_ssid =
+        restore_backup ? previous.ssid2 : previous.ssid;
+    const String& restore_password =
+        restore_backup ? previous.password2 : previous.password;
+    WiFi.begin(restore_ssid.c_str(), restore_password.c_str());
   }
   if (shared_mutex != nullptr) xSemaphoreTake(shared_mutex, portMAX_DELAY);
   candidate_result.ready = true;
@@ -2308,6 +2395,8 @@ void print_config() {
   const DeviceConfig current_config = copy_config();
   Serial.printf("ssid=%s\n", current_config.ssid.c_str());
   Serial.printf("password=%s\n", masked(current_config.password).c_str());
+  Serial.printf("ssid2=%s\n", current_config.ssid2.c_str());
+  Serial.printf("password2=%s\n", masked(current_config.password2).c_str());
   Serial.printf("base_url=%s\n", current_config.base_url.c_str());
   Serial.printf("token=%s\n", masked(current_config.token).c_str());
   Serial.printf("timezone=%s\n", current_config.timezone.c_str());
@@ -2336,7 +2425,8 @@ void print_config() {
 void print_help() {
   Serial.println("Commands:");
   Serial.println("  show");
-  Serial.println("  set ssid|password|base_url|token|timezone|refresh_seconds VALUE");
+  Serial.println("  set ssid|password|ssid2|password2 VALUE");
+  Serial.println("  set base_url|token|timezone|refresh_seconds VALUE");
   Serial.println("  set brightness_percent|dim_after_seconds VALUE");
   Serial.println("  set screen_off_after_seconds|screen_off_refresh_seconds VALUE");
 #if QUOTA_HAS_TOUCH
@@ -2354,6 +2444,10 @@ void set_config_value(const String& key, const String& value) {
     updated.ssid = value;
   else if (key == "password")
     updated.password = value;
+  else if (key == "ssid2")
+    updated.ssid2 = value;
+  else if (key == "password2")
+    updated.password2 = value;
   else if (key == "base_url")
     updated.base_url = value;
   else if (key == "token")
@@ -2413,8 +2507,9 @@ void set_config_value(const String& key, const String& value) {
     SharedStateLock lock;
     config = updated;
     config_dirty = true;
-    if (key == "ssid" || key == "password" || key == "base_url" ||
-        key == "token" || key == "timezone")
+    if (key == "ssid" || key == "password" || key == "ssid2" ||
+        key == "password2" || key == "base_url" || key == "token" ||
+        key == "timezone")
       network_config_dirty = true;
   }
   Serial.println("OK staged; run save to persist");
