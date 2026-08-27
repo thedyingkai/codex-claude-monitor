@@ -42,8 +42,9 @@ $Generated = [IO.File]::ReadAllText($OutputPath)
 $Generated = [Text.RegularExpressions.Regex]::Replace(
     $Generated,
     '(?m)^ \* Opts:.*$',
-    ' * Generated with lv_font_conv from Noto Sans SC at 16 px / 4 bpp.'
+    ' * Generated with lv_font_conv from Noto Sans CJK SC Medium at 16 px / 4 bpp.'
 )
+$Generated = $Generated.TrimEnd("`r", "`n") + "`n"
 [IO.File]::WriteAllText($OutputPath, $Generated, [Text.UTF8Encoding]::new($false))
 
 Write-Host "Generated $OutputPath"

@@ -239,7 +239,7 @@ OTA 分区余量。设备拒绝同版本、降级版本、重定向和不同源�
 ### Claude 为 `unavailable`
 
 - 运行 `claude auth status --json`。Claude 未登录时该命令在部分版本会返回非零退出码，但仍输出 JSON；采集器会优先解析 JSON。
-- 手工执行 `claude -p "/usage" --output-format stream-json --verbose --no-session-persistence`，确认是 slash command 输出且包含配额字段。
+- 手工执行 `claude -p "/usage" --output-format stream-json --verbose --no-session-persistence`，确认是 slash command 输出且包含配额数据。Claude Code 2.1.220 可能只在 JSON 的 `result` 文本中返回 `Current session`、`Current week (all models)` 以及 `resets Aug 25, 8:59pm (UTC)` 一类重置时间，而不返回结构化 `rate_limits`；采集器同时支持这种绝对时间和 `resets in 17h6m` 相对时间。
 - 若 `/usage` 字段改变，statusLine 的结构化 `five_hour`/`seven_day` 可作为回退；确保 Claude 设置仍指向包装器。
 - 不要改用普通提示词探测，否则会产生不必要的模型调用。
 

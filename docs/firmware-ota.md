@@ -4,6 +4,15 @@ v0.3.0 是启用手机配网和 OTA 的首个版本。它必须先通过 USB 数
 正在运行 v0.3.0 以后，后续版本才可以无线安装。手机配网页只在设备临时创建的
 WPA2 热点上提供，不是云端管理后台，也不会暴露到设备连接的普通 Wi-Fi。
 
+v0.3.1 在不改变原主 Wi-Fi 配置的前提下增加一组可选备用 Wi-Fi。每组网络最多尝试
+12 秒；整轮失败后按 1、2、4 秒逐步退避，最长 60 秒。连接成功后，本次运行期间会
+优先重试最后成功的网络；手动刷新会清除当前退避并立即开始新一轮连接。
+
+同一版本还兼容 Claude Code 2.1.220 的文本型 `/usage` 输出，可解析当前会话和
+`Current week (all models)` 周限额。额度主界面的布局及正常蓝/橙配色保持不变；
+中文字体从 Regular 换为 Noto Sans CJK SC Medium 16px，并提高卡片和顶栏不透明度。
+离线或过期数据改用灰色，避免与 Claude 的正常额度颜色混淆。
+
 ## 显示与触摸
 
 默认行为如下：
@@ -27,6 +36,8 @@ set brightness_percent 60
 set dim_after_seconds 60
 set screen_off_after_seconds 300
 set screen_off_refresh_seconds 60
+set ssid2 BackupWiFi
+set password2 BackupPassword
 save
 ```
 
@@ -47,12 +58,14 @@ save
 
 手机连接热点后访问 `http://192.168.4.1`，可配置：
 
-- 扫描或手工输入 SSID、Wi-Fi 密码；
+- 扫描或手工输入主 Wi-Fi，以及可选的备用 Wi-Fi 和各自密码；
 - HTTPS 服务器地址、`display:read` 令牌、时区和快照刷新周期；
 - 正常亮度、降亮时间、熄屏时间和熄屏刷新周期；
 - 查看当前固件及服务器最新版本，并在人工确认后安装 OTA。
 
-编辑已有配置时，页面不会返回密码或令牌；秘密输入框留空表示保留旧值。提交的新
+编辑已有配置时，页面不会返回密码或令牌；SSID 未改时，秘密输入框留空表示保留
+旧密码；SSID 改动或清空时不会错误沿用之前网络的密码。主、备用 SSID 不能相同。
+提交的新
 配置先只放在内存中，依次测试 Wi-Fi（20 秒）、NTP（15 秒）及 HTTPS/TLS/令牌/
 快照（10 秒）。全部成功才写入 NVS并重启；任何一步失败都会恢复旧连接和旧配置。
 更改服务器地址或令牌会清除快照缓存及防重放时间戳，仅改 Wi-Fi、时区或亮度则保留。
@@ -92,7 +105,7 @@ quota-monitor standalone \
 quota-monitor firmware publish \
   --firmware-dir /var/lib/quota-monitor/firmware \
   --board e32r28t \
-  --version 0.3.0 \
+  --version 0.3.1 \
   --file firmware/.pio/build/e32r28t/firmware.bin
 ```
 

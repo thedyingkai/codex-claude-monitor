@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init"}
+{"type":"result","subtype":"success","is_error":false,"result":"Plan usage limits\nCurrent session: 31% used · resets Nov 9, 8:09am (UTC)\nCurrent week (all models): 47% used · resets Nov 14, 8:59pm (UTC)\nCurrent week (Sonnet only): 88% used · resets Nov 15, 9pm (UTC)"}

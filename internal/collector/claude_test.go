@@ -41,12 +41,146 @@ func TestParseClaudeUsageNDJSONFixture(t *testing.T) {
 
 func TestParseClaudeUsageRenderedCommandText(t *testing.T) {
 	payload := []byte("{\"type\":\"result\",\"result\":\"Current session\\n25% used\\nResets 2026-08-03T05:00:00Z\\nCurrent week (all models)\\n40% used\\nResets 2026-08-09T00:00:00Z\\nCurrent week (Sonnet only)\\n99% used\\nResets 2026-08-10T00:00:00Z\"}\n")
-	report, err := ParseClaudeUsage(payload, time.Unix(2, 0))
+	observedAt := time.Date(2026, time.August, 3, 0, 0, 0, 0, time.UTC)
+	report, err := ParseClaudeUsage(payload, observedAt)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if report.Windows.FiveHour == nil || report.Windows.FiveHour.UsedPercent != 25 || report.Windows.SevenDay == nil || report.Windows.SevenDay.UsedPercent != 40 {
 		t.Fatalf("unexpected rendered /usage parse: %+v", report.Windows)
+	}
+}
+
+func TestParseClaudeUsageCurrentHeadlessText(t *testing.T) {
+	payload, err := os.ReadFile("testdata/claude-usage-2.1.220.ndjson")
+	if err != nil {
+		t.Fatal(err)
+	}
+	observedAt := time.Date(2026, time.November, 9, 3, 0, 0, 0, time.UTC)
+	report, err := ParseClaudeUsage(payload, observedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Windows.FiveHour == nil || report.Windows.FiveHour.UsedPercent != 31 {
+		t.Fatalf("unexpected five-hour window: %+v", report.Windows.FiveHour)
+	}
+	if want := time.Date(2026, time.November, 9, 8, 9, 0, 0, time.UTC); !report.Windows.FiveHour.ResetsAt.Equal(want) {
+		t.Fatalf("five-hour reset = %s, want %s", report.Windows.FiveHour.ResetsAt, want)
+	}
+	if report.Windows.SevenDay == nil || report.Windows.SevenDay.UsedPercent != 47 {
+		t.Fatalf("unexpected seven-day window: %+v", report.Windows.SevenDay)
+	}
+	if want := time.Date(2026, time.November, 14, 20, 59, 0, 0, time.UTC); !report.Windows.SevenDay.ResetsAt.Equal(want) {
+		t.Fatalf("seven-day reset = %s, want %s", report.Windows.SevenDay.ResetsAt, want)
+	}
+}
+
+func TestParseClaudeUsageRelativeWeeklyLimit(t *testing.T) {
+	payload := []byte("{\"type\":\"result\",\"result\":\"Current session\\n12% used\\nResets in 4h26m\\nWeekly limits\\nAll models\\n43% used\\nResets in 6d17h6m\\nCurrent week (Opus only)\\n99% used\\nResets in 1d\"}\n")
+	observedAt := time.Date(2026, time.August, 25, 3, 0, 0, 0, time.UTC)
+	report, err := ParseClaudeUsage(payload, observedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Windows.FiveHour == nil || report.Windows.FiveHour.UsedPercent != 12 {
+		t.Fatalf("unexpected five-hour window: %+v", report.Windows.FiveHour)
+	}
+	if want := observedAt.Add(4*time.Hour + 26*time.Minute); !report.Windows.FiveHour.ResetsAt.Equal(want) {
+		t.Fatalf("five-hour reset = %s, want %s", report.Windows.FiveHour.ResetsAt, want)
+	}
+	if report.Windows.SevenDay == nil || report.Windows.SevenDay.UsedPercent != 43 {
+		t.Fatalf("unexpected seven-day window: %+v", report.Windows.SevenDay)
+	}
+	if want := observedAt.Add(6*24*time.Hour + 17*time.Hour + 6*time.Minute); !report.Windows.SevenDay.ResetsAt.Equal(want) {
+		t.Fatalf("seven-day reset = %s, want %s", report.Windows.SevenDay.ResetsAt, want)
+	}
+}
+
+func TestParseClaudeUsageRelativeDurationsAreNotHeadings(t *testing.T) {
+	payload := []byte("{\"type\":\"result\",\"result\":\"Current session\\n12% used\\nResets in 5h\\nCurrent week (all models)\\n43% used\\nResets in 7d\"}\n")
+	observedAt := time.Date(2026, time.August, 25, 3, 0, 0, 0, time.UTC)
+	report, err := ParseClaudeUsage(payload, observedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Windows.FiveHour == nil || report.Windows.FiveHour.UsedPercent != 12 {
+		t.Fatalf("unexpected five-hour window: %+v", report.Windows.FiveHour)
+	}
+	if want := observedAt.Add(5 * time.Hour); !report.Windows.FiveHour.ResetsAt.Equal(want) {
+		t.Fatalf("five-hour reset = %s, want %s", report.Windows.FiveHour.ResetsAt, want)
+	}
+	if report.Windows.SevenDay == nil || report.Windows.SevenDay.UsedPercent != 43 {
+		t.Fatalf("unexpected seven-day window: %+v", report.Windows.SevenDay)
+	}
+	if want := observedAt.Add(7 * 24 * time.Hour); !report.Windows.SevenDay.ResetsAt.Equal(want) {
+		t.Fatalf("seven-day reset = %s, want %s", report.Windows.SevenDay.ResetsAt, want)
+	}
+}
+
+func TestParseClaudeUsageIgnoresAnyModelSpecificWeeklyWindow(t *testing.T) {
+	payload := []byte("{\"type\":\"result\",\"result\":\"Current week (all models): 4% used · resets Aug 28, 8pm (UTC)\\nCurrent week (Haiku 4.5 only): 99% used · resets Aug 29, 8pm (UTC)\"}\n")
+	observedAt := time.Date(2026, time.August, 27, 3, 0, 0, 0, time.UTC)
+	report, err := ParseClaudeUsage(payload, observedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Windows.SevenDay == nil || report.Windows.SevenDay.UsedPercent != 4 {
+		t.Fatalf("model-specific window replaced all-model window: %+v", report.Windows.SevenDay)
+	}
+	want := time.Date(2026, time.August, 28, 20, 0, 0, 0, time.UTC)
+	if !report.Windows.SevenDay.ResetsAt.Equal(want) {
+		t.Fatalf("seven-day reset = %s, want %s", report.Windows.SevenDay.ResetsAt, want)
+	}
+}
+
+func TestParseClaudeUsageAbsoluteResetInfersNextYear(t *testing.T) {
+	observedAt := time.Date(2026, time.December, 31, 15, 0, 0, 0, time.UTC)
+	payload := []byte("{\"type\":\"result\",\"result\":\"Current session: 10% used · resets Jan 1 at 12:30am (Asia/Shanghai)\"}\n")
+	report, err := ParseClaudeUsage(payload, observedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Windows.FiveHour == nil {
+		t.Fatal("five-hour window is missing")
+	}
+	want := time.Date(2026, time.December, 31, 16, 30, 0, 0, time.UTC)
+	if !report.Windows.FiveHour.ResetsAt.Equal(want) {
+		t.Fatalf("five-hour reset = %s, want %s", report.Windows.FiveHour.ResetsAt, want)
+	}
+}
+
+func TestParseClaudeUsageAbsoluteResetInfersPreviousYear(t *testing.T) {
+	observedAt := time.Date(2026, time.January, 1, 0, 30, 0, 0, time.UTC)
+	payload := []byte("{\"type\":\"result\",\"result\":\"Current session: 10% used · resets Dec 31 at 11:45pm (UTC)\"}\n")
+	report, err := ParseClaudeUsage(payload, observedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Windows.FiveHour == nil {
+		t.Fatal("five-hour window is missing")
+	}
+	want := time.Date(2025, time.December, 31, 23, 45, 0, 0, time.UTC)
+	if !report.Windows.FiveHour.ResetsAt.Equal(want) {
+		t.Fatalf("five-hour reset = %s, want %s", report.Windows.FiveHour.ResetsAt, want)
+	}
+}
+
+func TestParseClaudeUsageRejectsAbsoluteResetOutsideQuotaHorizon(t *testing.T) {
+	observedAt := time.Date(2026, time.August, 27, 3, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name    string
+		resetAt string
+	}{
+		{name: "omitted year", resetAt: "Dec 31 at 11:45pm (UTC)"},
+		{name: "explicit year", resetAt: "Dec 31, 2026, 11:45pm (UTC)"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			payload := []byte("{\"type\":\"result\",\"result\":\"Current session: 10% used · resets " + test.resetAt + "\"}\n")
+			if _, err := ParseClaudeUsage(payload, observedAt); err == nil {
+				t.Fatal("reset outside the quota horizon was accepted")
+			}
+		})
 	}
 }
 
