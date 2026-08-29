@@ -36,6 +36,7 @@
 
 #include "BatteryEstimate.h"
 #include "DisplayText.h"
+#include "ExternalPowerSense.h"
 #include "SnapshotParser.h"
 #include "ResponseBuffer.h"
 #include "RuntimePolicy.h"
@@ -145,6 +146,8 @@ struct DeviceConfig {
   String password;
   String ssid2;
   String password2;
+  String ssid3;
+  String password3;
   String base_url;
   String token;
   String timezone = "CST-8";
@@ -153,6 +156,9 @@ struct DeviceConfig {
   uint32_t dim_after_seconds = kDefaultDimSeconds;
   uint32_t screen_off_after_seconds = kDefaultScreenOffSeconds;
   uint32_t screen_off_refresh_seconds = kDefaultScreenOffRefreshSeconds;
+  // GPIO35 is input-only and has no internal pull resistor. Keep the external
+  // USB-power detector disabled until the documented divider is installed.
+  bool external_power_sense_enabled = false;
 #if QUOTA_HAS_TOUCH
   // Keyes' factory example values for a landscape E32R28T. Resistive panels
   // vary, so these can be replaced with values from a calibration run.
@@ -232,6 +238,9 @@ ButtonState button_b{PIN_BUTTON_B};
 #endif
 #if QUOTA_HAS_CARRIER_POWER
 quota_monitor::UsbSenseFilter usb_sense_filter;
+#endif
+#if QUOTA_HAS_EXTERNAL_POWER_SENSE
+quota_monitor::DigitalPresenceFilter external_power_filter{300U};
 #endif
 bool have_persisted_snapshot_cache = false;
 float cached_battery_soc = -1.0F;
@@ -443,8 +452,7 @@ void sample_battery_if_due() {
 
 String masked(const String& value) {
   if (value.isEmpty()) return "<empty>";
-  if (value.length() <= 6) return "******";
-  return value.substring(0, 3) + "..." + value.substring(value.length() - 3);
+  return "********";
 }
 
 bool brightness_allowed(uint32_t value) {
@@ -487,6 +495,8 @@ bool read_config_slot(uint8_t slot, DeviceConfig& value) {
     value.password = slot_preferences.getString("password", "");
     value.ssid2 = slot_preferences.getString("ssid2", "");
     value.password2 = slot_preferences.getString("password2", "");
+    value.ssid3 = slot_preferences.getString("ssid3", "");
+    value.password3 = slot_preferences.getString("password3", "");
     value.base_url = slot_preferences.getString("base_url", "");
     value.token = slot_preferences.getString("token", "");
     value.timezone = slot_preferences.getString("timezone", "CST-8");
@@ -500,6 +510,8 @@ bool read_config_slot(uint8_t slot, DeviceConfig& value) {
         slot_preferences.getUInt("off_sec", kDefaultScreenOffSeconds);
     value.screen_off_refresh_seconds = slot_preferences.getUInt(
         "off_refresh", kDefaultScreenOffRefreshSeconds);
+    value.external_power_sense_enabled =
+        slot_preferences.getBool("ext_power", false);
 #if QUOTA_HAS_TOUCH
     value.touch_x_min = slot_preferences.getUShort("touch_x0", 495);
     value.touch_x_max = slot_preferences.getUShort("touch_x1", 3398);
@@ -535,6 +547,10 @@ bool write_config_slot(uint8_t slot, const DeviceConfig& value) {
         value.ssid2.length();
   ok &= slot_preferences.putString("password2", value.password2) ==
         value.password2.length();
+  ok &= slot_preferences.putString("ssid3", value.ssid3) ==
+        value.ssid3.length();
+  ok &= slot_preferences.putString("password3", value.password3) ==
+        value.password3.length();
   ok &= slot_preferences.putString("base_url", value.base_url) ==
         value.base_url.length();
   ok &= slot_preferences.putString("token", value.token) == value.token.length();
@@ -551,6 +567,9 @@ bool write_config_slot(uint8_t slot, const DeviceConfig& value) {
   ok &= slot_preferences.putUInt("off_refresh",
                                  value.screen_off_refresh_seconds) ==
         sizeof(uint32_t);
+  ok &= slot_preferences.putBool("ext_power",
+                                 value.external_power_sense_enabled) ==
+        sizeof(bool);
 #if QUOTA_HAS_TOUCH
   ok &= slot_preferences.putUShort("touch_x0", value.touch_x_min) ==
         sizeof(uint16_t);
@@ -602,11 +621,15 @@ void load_config() {
     config.password = preferences.getString("password", "");
     config.ssid2 = preferences.getString("ssid2", "");
     config.password2 = preferences.getString("password2", "");
+    config.ssid3 = preferences.getString("ssid3", "");
+    config.password3 = preferences.getString("password3", "");
     config.base_url = preferences.getString("base_url", "");
     config.token = preferences.getString("token", "");
     config.timezone = preferences.getString("timezone", "CST-8");
     config.refresh_seconds =
         preferences.getUInt("refresh", kDefaultRefreshSeconds);
+    config.external_power_sense_enabled =
+        preferences.getBool("ext_power", false);
 #if QUOTA_HAS_TOUCH
     config.touch_x_min = preferences.getUShort("touch_x0", 495);
     config.touch_x_max = preferences.getUShort("touch_x1", 3398);
@@ -1224,8 +1247,10 @@ bool config_ready(const DeviceConfig& candidate, String& why) {
     why = "SSID missing";
     return false;
   }
-  if (!candidate.ssid2.isEmpty() && candidate.ssid2 == candidate.ssid) {
-    why = "backup SSID duplicates primary";
+  if (!quota_monitor::wifi_profile_ssids_valid(
+          candidate.ssid.c_str(), candidate.ssid2.c_str(),
+          candidate.ssid3.c_str())) {
+    why = "Wi-Fi SSIDs must be unique";
     return false;
   }
   const bool https_url = candidate.base_url.startsWith("https://");
@@ -1431,9 +1456,28 @@ bool fetch_snapshot(String& error) {
 void request_wifi_now() {
   const DeviceConfig current_config = copy_config();
   wifi_failover_policy.configure(!current_config.ssid.isEmpty(),
-                                 !current_config.ssid2.isEmpty());
+                                 !current_config.ssid2.isEmpty(),
+                                 !current_config.ssid3.isEmpty());
   wifi_failover_policy.manual_reset(millis());
   WiFi.disconnect();
+}
+
+const String& wifi_ssid_for_profile(const DeviceConfig& current_config,
+                                    quota_monitor::WifiProfile profile) {
+  if (profile == quota_monitor::WifiProfile::kBackup1)
+    return current_config.ssid2;
+  if (profile == quota_monitor::WifiProfile::kBackup2)
+    return current_config.ssid3;
+  return current_config.ssid;
+}
+
+const String& wifi_password_for_profile(const DeviceConfig& current_config,
+                                        quota_monitor::WifiProfile profile) {
+  if (profile == quota_monitor::WifiProfile::kBackup1)
+    return current_config.password2;
+  if (profile == quota_monitor::WifiProfile::kBackup2)
+    return current_config.password3;
+  return current_config.password;
 }
 
 void service_wifi() {
@@ -1447,7 +1491,8 @@ void service_wifi() {
   if (portal_active || network_reserved || network_config_dirty) return;
 
   wifi_failover_policy.configure(!current_config.ssid.isEmpty(),
-                                 !current_config.ssid2.isEmpty());
+                                 !current_config.ssid2.isEmpty(),
+                                 !current_config.ssid3.isEmpty());
   const bool connected = WiFi.status() == WL_CONNECTED;
   if (connected) {
     const String connected_ssid = WiFi.SSID();
@@ -1457,18 +1502,20 @@ void service_wifi() {
     } else if (!current_config.ssid2.isEmpty() &&
                connected_ssid == current_config.ssid2) {
       wifi_failover_policy.note_connected(
-          quota_monitor::WifiProfile::kBackup);
+          quota_monitor::WifiProfile::kBackup1);
+    } else if (!current_config.ssid3.isEmpty() &&
+               connected_ssid == current_config.ssid3) {
+      wifi_failover_policy.note_connected(
+          quota_monitor::WifiProfile::kBackup2);
     }
   }
 
   const quota_monitor::WifiFailoverDecision decision =
       wifi_failover_policy.update(millis(), connected);
   if (decision.action == quota_monitor::WifiFailoverAction::kStartProfile) {
-    const bool use_backup =
-        decision.profile == quota_monitor::WifiProfile::kBackup;
-    const String& ssid = use_backup ? current_config.ssid2 : current_config.ssid;
+    const String& ssid = wifi_ssid_for_profile(current_config, decision.profile);
     const String& password =
-        use_backup ? current_config.password2 : current_config.password;
+        wifi_password_for_profile(current_config, decision.profile);
     WiFi.disconnect(false, false);
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), password.c_str());
@@ -1576,14 +1623,14 @@ const char kPortalPage[] PROGMEM = R"HTML(<!doctype html>
 <title>QMON 配置</title><style>
 body{font-family:system-ui,sans-serif;background:#071225;color:#f8fafc;margin:0;padding:18px}main{max-width:620px;margin:auto}fieldset{border:1px solid #28527a;border-radius:12px;margin:12px 0;padding:14px;background:#0c1b35}label{display:block;margin:9px 0 4px}input,select,button{box-sizing:border-box;width:100%;padding:10px;border-radius:8px;border:1px solid #52779c;background:#102746;color:#fff}button{background:#1677d2;font-weight:700;margin-top:12px}button:disabled{opacity:.5}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.muted{color:#a9bfd7;font-size:.9em}.ok{color:#86efac}.bad{color:#fca5a5}@media(max-width:520px){.row{grid-template-columns:1fr}}</style></head>
 <body><main><h1>QMON 配置</h1><p id="device" class="muted">正在读取设备…</p>
-<fieldset><legend>Wi-Fi 与服务器</legend><label>扫描到的 Wi-Fi</label><select id="scan"><option>正在扫描…</option></select><label>主 Wi-Fi 名称</label><input id="ssid" maxlength="32" autocomplete="off"><label>主 Wi-Fi 密码</label><input id="password" type="password" maxlength="64" placeholder="留空保留原密码"><label>备用 Wi-Fi 名称（可选）</label><input id="ssid2" maxlength="32" autocomplete="off"><label>备用 Wi-Fi 密码</label><input id="password2" type="password" maxlength="64" placeholder="留空保留原密码"><label>HTTPS 服务器地址</label><input id="base_url" maxlength="255"><label>显示令牌</label><input id="token" type="password" maxlength="256" placeholder="留空保留原令牌"><label>时区</label><input id="timezone" maxlength="64" value="CST-8"><label>正常刷新（秒）</label><input id="refresh_seconds" type="number" min="5" max="3600"></fieldset>
-<fieldset><legend>屏幕</legend><label>正常亮度</label><select id="brightness_percent"><option>30</option><option>60</option><option>100</option></select><div class="row"><div><label>降亮时间（秒，0 禁用）</label><input id="dim_after_seconds" type="number" min="0" max="86400"></div><div><label>熄屏时间（秒，0 禁用）</label><input id="screen_off_after_seconds" type="number" min="0" max="86400"></div></div><label>熄屏刷新（秒）</label><input id="screen_off_refresh_seconds" type="number" min="60" max="3600"><button id="save">测试并保存</button><p id="configStatus" class="muted"></p></fieldset>
+<fieldset><legend>Wi-Fi 与服务器</legend><label>扫描到的 Wi-Fi</label><select id="scan"><option>正在扫描…</option></select><label>主 Wi-Fi 名称</label><input id="ssid" maxlength="32" autocomplete="off"><label>主 Wi-Fi 密码</label><input id="password" type="password" maxlength="64" placeholder="留空保留原密码"><label>备用 Wi-Fi 1 名称（可选）</label><input id="ssid2" maxlength="32" autocomplete="off"><label>备用 Wi-Fi 1 密码</label><input id="password2" type="password" maxlength="64" placeholder="留空保留原密码"><label>备用 Wi-Fi 2 名称（可选）</label><input id="ssid3" maxlength="32" autocomplete="off"><label>备用 Wi-Fi 2 密码</label><input id="password3" type="password" maxlength="64" placeholder="留空保留原密码"><label>HTTPS 服务器地址</label><input id="base_url" maxlength="255"><label>显示令牌</label><input id="token" type="password" maxlength="256" placeholder="留空保留原令牌"><label>时区</label><input id="timezone" maxlength="64" value="CST-8"><label>正常刷新（秒）</label><input id="refresh_seconds" type="number" min="5" max="3600"></fieldset>
+<fieldset><legend>屏幕</legend><label>正常亮度</label><select id="brightness_percent"><option>30</option><option>60</option><option>100</option></select><div class="row"><div><label>降亮时间（秒，0 禁用）</label><input id="dim_after_seconds" type="number" min="0" max="86400"></div><div><label>熄屏时间（秒，0 禁用）</label><input id="screen_off_after_seconds" type="number" min="0" max="86400"></div></div><label>熄屏刷新（秒）</label><input id="screen_off_refresh_seconds" type="number" min="60" max="3600"><label><input id="external_power_sense_enabled" type="checkbox" style="width:auto"> 已按接线说明安装 USB +5V 到 GPIO35 的分压检测线</label><button id="save">测试并保存</button><p id="configStatus" class="muted"></p></fieldset>
 <fieldset><legend>无线升级</legend><p id="ota" class="muted">正在检查…</p><label><input id="usb" type="checkbox" style="width:auto"> 已连接稳定 USB 电源</label><button id="install" disabled>确认安装升级</button><p id="otaProgress" class="muted"></p></fieldset></main>
 <script>
 let csrf='';const $=id=>document.getElementById(id);async function j(url,opt){const r=await fetch(url,opt);const x=await r.json();if(!r.ok)throw Error(x.error||r.status);return x}
-async function status(){try{const s=await j('/api/status');csrf=s.csrf||csrf;$('device').textContent=`固件 ${s.firmware} · ${s.ip||'未联网'}`;for(const k of ['ssid','ssid2','base_url','timezone','refresh_seconds','brightness_percent','dim_after_seconds','screen_off_after_seconds','screen_off_refresh_seconds'])if(s[k]!==undefined)$(k).value=s[k]}catch(e){$('device').textContent=e.message}}
-async function wifi(){try{const w=await j('/api/wifi');$('scan').innerHTML='<option value="">手动输入</option>'+w.networks.map(n=>`<option value="${n.ssid.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;')}">${n.ssid} (${n.rssi} dBm)</option>`).join('');$('scan').onchange=()=>{if($('scan').value)$('ssid').value=$('scan').value}}catch(e){setTimeout(wifi,1500)}}
-$('save').onclick=async()=>{const body={};for(const k of ['ssid','password','ssid2','password2','base_url','token','timezone'])body[k]=$(k).value;for(const k of ['refresh_seconds','brightness_percent','dim_after_seconds','screen_off_after_seconds','screen_off_refresh_seconds'])body[k]=Number($(k).value);try{await j('/api/config',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(body)});$('configStatus').textContent='正在测试 Wi-Fi、时间和服务器…'}catch(e){$('configStatus').textContent=e.message}}
+async function status(){try{const s=await j('/api/status');csrf=s.csrf||csrf;$('device').textContent=`固件 ${s.firmware} · ${s.ip||'未联网'}`;for(const k of ['ssid','ssid2','ssid3','base_url','timezone','refresh_seconds','brightness_percent','dim_after_seconds','screen_off_after_seconds','screen_off_refresh_seconds'])if(s[k]!==undefined)$(k).value=s[k];$('external_power_sense_enabled').checked=!!s.external_power_sense_enabled}catch(e){$('device').textContent=e.message}}
+async function wifi(){try{const w=await j('/api/wifi'),s=$('scan');s.replaceChildren(new Option('手动输入',''));for(const n of w.networks)s.add(new Option(`${n.ssid} (${n.rssi} dBm)`,n.ssid));s.onchange=()=>{if(s.value)$('ssid').value=s.value}}catch(e){setTimeout(wifi,1500)}}
+$('save').onclick=async()=>{const body={};for(const k of ['ssid','password','ssid2','password2','ssid3','password3','base_url','token','timezone'])body[k]=$(k).value;for(const k of ['refresh_seconds','brightness_percent','dim_after_seconds','screen_off_after_seconds','screen_off_refresh_seconds'])body[k]=Number($(k).value);body.external_power_sense_enabled=$('external_power_sense_enabled').checked;try{await j('/api/config',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(body)});$('configStatus').textContent='正在测试 Wi-Fi、时间和服务器…'}catch(e){$('configStatus').textContent=e.message}}
 async function cfg(){try{const c=await j('/api/config/status');$('configStatus').textContent=c.status+(c.error?': '+c.error:'')}catch(e){}setTimeout(cfg,1000)}
 async function ota(){try{const o=await j('/api/ota/status');$('ota').textContent=`当前 ${o.currentVersion} · 最新 ${o.latestVersion||'--'}${o.error?' · '+o.error:''}`;$('install').disabled=!o.updateAvailable||o.installing;$('otaProgress').textContent=o.installing?`升级中 ${o.progressPercent}%`:o.status}catch(e){}setTimeout(ota,1200)}
 $('install').onclick=async()=>{if(!$('usb').checked)return alert('请先确认稳定 USB 电源');if(!confirm('安装后设备会重启，继续？'))return;try{await j('/api/ota/install',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({confirmUsbPower:true})})}catch(e){alert(e.message)}};
@@ -1611,6 +1658,7 @@ void register_portal_handlers() {
     body["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
     body["ssid"] = current_config.ssid;
     body["ssid2"] = current_config.ssid2;
+    body["ssid3"] = current_config.ssid3;
     body["base_url"] = current_config.base_url;
     body["timezone"] = current_config.timezone;
     body["refresh_seconds"] = current_config.refresh_seconds;
@@ -1619,8 +1667,11 @@ void register_portal_handlers() {
     body["screen_off_after_seconds"] = current_config.screen_off_after_seconds;
     body["screen_off_refresh_seconds"] =
         current_config.screen_off_refresh_seconds;
+    body["external_power_sense_enabled"] =
+        current_config.external_power_sense_enabled;
     body["passwordConfigured"] = !current_config.password.isEmpty();
     body["password2Configured"] = !current_config.password2.isEmpty();
+    body["password3Configured"] = !current_config.password3.isEmpty();
     body["tokenConfigured"] = !current_config.token.isEmpty();
     if (portal_session_valid()) body["csrf"] = portal_csrf;
     send_portal_json(200, body);
@@ -1665,8 +1716,9 @@ void register_portal_handlers() {
       return true;
     };
     bool valid = assign_string("ssid", candidate.ssid, 32, false) &&
-                 assign_string("ssid2", candidate.ssid2, 32, false) &&
-                 assign_string("base_url", candidate.base_url, 255, false) &&
+                  assign_string("ssid2", candidate.ssid2, 32, false) &&
+                  assign_string("ssid3", candidate.ssid3, 32, false) &&
+                  assign_string("base_url", candidate.base_url, 255, false) &&
                  assign_string("token", candidate.token, 256, true) &&
                  assign_string("timezone", candidate.timezone, 64, false);
     const auto assign_password = [&input](const char* key,
@@ -1688,7 +1740,9 @@ void register_portal_handlers() {
     valid &= assign_password("password", original.ssid, candidate.ssid,
                              candidate.password);
     valid &= assign_password("password2", original.ssid2, candidate.ssid2,
-                             candidate.password2);
+                              candidate.password2);
+    valid &= assign_password("password3", original.ssid3, candidate.ssid3,
+                              candidate.password3);
     if (!valid || candidate.timezone.isEmpty()) {
       add_portal_security_headers();
       portal_server.send(400, "application/json",
@@ -1708,7 +1762,15 @@ void register_portal_handlers() {
     valid &= assign_uint("screen_off_after_seconds",
                          candidate.screen_off_after_seconds);
     valid &= assign_uint("screen_off_refresh_seconds",
-                         candidate.screen_off_refresh_seconds);
+                          candidate.screen_off_refresh_seconds);
+    if (!input["external_power_sense_enabled"].isNull()) {
+      if (!input["external_power_sense_enabled"].is<bool>()) {
+        valid = false;
+      } else {
+        candidate.external_power_sense_enabled =
+            input["external_power_sense_enabled"].as<bool>();
+      }
+    }
     String why;
     if (!valid || candidate.refresh_seconds < 5 ||
         candidate.refresh_seconds > 3600 ||
@@ -1948,16 +2010,28 @@ void worker_test_candidate() {
                                candidate.password != previous.password;
   const bool backup_changed = candidate.ssid2 != previous.ssid2 ||
                               candidate.password2 != previous.password2;
-  bool test_backup = !primary_changed && backup_changed &&
-                     !candidate.ssid2.isEmpty();
-  if (!primary_changed && !backup_changed &&
-      previously_connected_ssid == candidate.ssid2 &&
-      !candidate.ssid2.isEmpty()) {
-    test_backup = true;
+  const bool backup2_changed = candidate.ssid3 != previous.ssid3 ||
+                               candidate.password3 != previous.password3;
+  quota_monitor::WifiProfile test_profile =
+      quota_monitor::WifiProfile::kPrimary;
+  if (!primary_changed && backup_changed && !candidate.ssid2.isEmpty()) {
+    test_profile = quota_monitor::WifiProfile::kBackup1;
+  } else if (!primary_changed && !backup_changed && backup2_changed &&
+             !candidate.ssid3.isEmpty()) {
+    test_profile = quota_monitor::WifiProfile::kBackup2;
+  } else if (!primary_changed && !backup_changed && !backup2_changed) {
+    if (!candidate.ssid2.isEmpty() &&
+        previously_connected_ssid == candidate.ssid2) {
+      test_profile = quota_monitor::WifiProfile::kBackup1;
+    } else if (!candidate.ssid3.isEmpty() &&
+               previously_connected_ssid == candidate.ssid3) {
+      test_profile = quota_monitor::WifiProfile::kBackup2;
+    }
   }
-  const String& candidate_ssid = test_backup ? candidate.ssid2 : candidate.ssid;
+  const String& candidate_ssid =
+      wifi_ssid_for_profile(candidate, test_profile);
   const String& candidate_password =
-      test_backup ? candidate.password2 : candidate.password;
+      wifi_password_for_profile(candidate, test_profile);
 
   String error;
   WiFi.disconnect(false, false);
@@ -1996,12 +2070,19 @@ void worker_test_candidate() {
     configTzTime(previous.timezone.c_str(), "pool.ntp.org",
                  "time.cloudflare.com");
     WiFi.disconnect(false, false);
-    const bool restore_backup = !previous.ssid2.isEmpty() &&
-                                previously_connected_ssid == previous.ssid2;
+    quota_monitor::WifiProfile restore_profile =
+        quota_monitor::WifiProfile::kPrimary;
+    if (!previous.ssid2.isEmpty() &&
+        previously_connected_ssid == previous.ssid2) {
+      restore_profile = quota_monitor::WifiProfile::kBackup1;
+    } else if (!previous.ssid3.isEmpty() &&
+               previously_connected_ssid == previous.ssid3) {
+      restore_profile = quota_monitor::WifiProfile::kBackup2;
+    }
     const String& restore_ssid =
-        restore_backup ? previous.ssid2 : previous.ssid;
+        wifi_ssid_for_profile(previous, restore_profile);
     const String& restore_password =
-        restore_backup ? previous.password2 : previous.password;
+        wifi_password_for_profile(previous, restore_profile);
     WiFi.begin(restore_ssid.c_str(), restore_password.c_str());
   }
   if (shared_mutex != nullptr) xSemaphoreTake(shared_mutex, portMAX_DELAY);
@@ -2397,6 +2478,8 @@ void print_config() {
   Serial.printf("password=%s\n", masked(current_config.password).c_str());
   Serial.printf("ssid2=%s\n", current_config.ssid2.c_str());
   Serial.printf("password2=%s\n", masked(current_config.password2).c_str());
+  Serial.printf("ssid3=%s\n", current_config.ssid3.c_str());
+  Serial.printf("password3=%s\n", masked(current_config.password3).c_str());
   Serial.printf("base_url=%s\n", current_config.base_url.c_str());
   Serial.printf("token=%s\n", masked(current_config.token).c_str());
   Serial.printf("timezone=%s\n", current_config.timezone.c_str());
@@ -2410,8 +2493,12 @@ void print_config() {
                 static_cast<unsigned long>(
                     current_config.screen_off_after_seconds));
   Serial.printf("screen_off_refresh_seconds=%lu\n",
-                static_cast<unsigned long>(
-                    current_config.screen_off_refresh_seconds));
+                 static_cast<unsigned long>(
+                     current_config.screen_off_refresh_seconds));
+  Serial.printf("external_power_sense_enabled=%s\n",
+                current_config.external_power_sense_enabled ? "yes" : "no");
+  Serial.printf("external_power_present=%s\n",
+                display_state.external_power_present() ? "yes" : "no");
 #if QUOTA_HAS_TOUCH
   Serial.printf("touch_cal=%u,%u,%u,%u\n", current_config.touch_x_min,
                 current_config.touch_x_max, current_config.touch_y_min,
@@ -2425,15 +2512,17 @@ void print_config() {
 void print_help() {
   Serial.println("Commands:");
   Serial.println("  show");
-  Serial.println("  set ssid|password|ssid2|password2 VALUE");
+  Serial.println("  set ssid|password|ssid2|password2|ssid3|password3 VALUE");
   Serial.println("  set base_url|token|timezone|refresh_seconds VALUE");
   Serial.println("  set brightness_percent|dim_after_seconds VALUE");
   Serial.println("  set screen_off_after_seconds|screen_off_refresh_seconds VALUE");
+  Serial.println("  set external_power_sense_enabled 0|1");
 #if QUOTA_HAS_TOUCH
   Serial.println("  set touch_x_min|touch_x_max|touch_y_min|touch_y_max VALUE");
 #endif
   Serial.println("  test");
   Serial.println("  save");
+  Serial.println("  wifi-promote {\"ssid\":\"...\",\"password\":\"...\"}");
   Serial.println("  portal");
   Serial.println("  factory-reset");
 }
@@ -2448,6 +2537,10 @@ void set_config_value(const String& key, const String& value) {
     updated.ssid2 = value;
   else if (key == "password2")
     updated.password2 = value;
+  else if (key == "ssid3")
+    updated.ssid3 = value;
+  else if (key == "password3")
+    updated.password3 = value;
   else if (key == "base_url")
     updated.base_url = value;
   else if (key == "token")
@@ -2486,6 +2579,15 @@ void set_config_value(const String& key, const String& value) {
       return;
     }
     updated.screen_off_refresh_seconds = static_cast<uint32_t>(seconds);
+  } else if (key == "external_power_sense_enabled") {
+    if (value == "1" || value == "true" || value == "yes") {
+      updated.external_power_sense_enabled = true;
+    } else if (value == "0" || value == "false" || value == "no") {
+      updated.external_power_sense_enabled = false;
+    } else {
+      Serial.println("ERR external_power_sense_enabled must be 0 or 1");
+      return;
+    }
 #if QUOTA_HAS_TOUCH
   } else if (key == "touch_x_min" || key == "touch_x_max" ||
              key == "touch_y_min" || key == "touch_y_max") {
@@ -2508,11 +2610,68 @@ void set_config_value(const String& key, const String& value) {
     config = updated;
     config_dirty = true;
     if (key == "ssid" || key == "password" || key == "ssid2" ||
-        key == "password2" || key == "base_url" || key == "token" ||
-        key == "timezone")
+        key == "password2" || key == "ssid3" || key == "password3" ||
+        key == "base_url" || key == "token" || key == "timezone")
       network_config_dirty = true;
   }
   Serial.println("OK staged; run save to persist");
+}
+
+void stage_promoted_wifi(const String& json) {
+  JsonDocument input;
+  if (deserializeJson(input, json) || !input["ssid"].is<const char*>() ||
+      !input["password"].is<const char*>()) {
+    Serial.println("ERR wifi-promote requires JSON string ssid and password");
+    return;
+  }
+  const String new_ssid = input["ssid"].as<String>();
+  const String new_password = input["password"].as<String>();
+  if (new_ssid.isEmpty() || new_ssid.length() > 32 ||
+      new_password.length() > 64) {
+    Serial.println("ERR invalid Wi-Fi credential length");
+    return;
+  }
+
+  DeviceConfig updated = copy_config();
+  if (new_ssid == updated.ssid) {
+    if (!new_password.isEmpty()) updated.password = new_password;
+  } else if (new_ssid == updated.ssid2) {
+    const String promoted_password =
+        new_password.isEmpty() ? updated.password2 : new_password;
+    updated.ssid2 = updated.ssid;
+    updated.password2 = updated.password;
+    updated.ssid = new_ssid;
+    updated.password = promoted_password;
+  } else if (new_ssid == updated.ssid3) {
+    const String promoted_password =
+        new_password.isEmpty() ? updated.password3 : new_password;
+    updated.ssid3 = updated.ssid2;
+    updated.password3 = updated.password2;
+    updated.ssid2 = updated.ssid;
+    updated.password2 = updated.password;
+    updated.ssid = new_ssid;
+    updated.password = promoted_password;
+  } else {
+    updated.ssid3 = updated.ssid2;
+    updated.password3 = updated.password2;
+    updated.ssid2 = updated.ssid;
+    updated.password2 = updated.password;
+    updated.ssid = new_ssid;
+    updated.password = new_password;
+  }
+
+  String why;
+  if (!config_ready(updated, why)) {
+    Serial.println("ERR " + why);
+    return;
+  }
+  {
+    SharedStateLock lock;
+    config = updated;
+    config_dirty = true;
+    network_config_dirty = true;
+  }
+  Serial.println("OK Wi-Fi priority staged; run save to persist");
 }
 
 void handle_serial_command(String line) {
@@ -2553,6 +2712,8 @@ void handle_serial_command(String line) {
     start_configuration_portal();
   } else if (line == "help") {
     print_help();
+  } else if (line.startsWith("wifi-promote ")) {
+    stage_promoted_wifi(line.substring(13));
   } else if (line.startsWith("set ")) {
     const int key_end = line.indexOf(' ', 4);
     if (key_end < 0) {
@@ -2629,6 +2790,23 @@ void enter_soft_off() {
   sleep_soft_off(true);
 }
 #endif
+
+bool external_power_present_now() {
+#if QUOTA_HAS_CARRIER_POWER
+  return usb_sense_filter.initialized() ? usb_sense_filter.present()
+                                        : usb_present();
+#elif QUOTA_HAS_EXTERNAL_POWER_SENSE
+  const DeviceConfig current_config = copy_config();
+  if (!current_config.external_power_sense_enabled) {
+    external_power_filter.reset();
+    return false;
+  }
+  return external_power_filter.update(
+      millis(), digitalRead(PIN_EXTERNAL_POWER_SENSE) == HIGH);
+#else
+  return false;
+#endif
+}
 
 void change_brightness() {
   DeviceConfig current_config = copy_config();
@@ -2883,6 +3061,11 @@ void setup() {
   pinMode(PIN_BUTTON_A, INPUT_PULLUP);
   analogReadResolution(12);
   analogSetPinAttenuation(PIN_BATTERY_ADC, ADC_11db);
+#if QUOTA_HAS_EXTERNAL_POWER_SENSE
+  // GPIO35 has no internal pull resistor. It is only sampled after the user
+  // explicitly enables the documented external 100k/150k VBUS divider.
+  pinMode(PIN_EXTERNAL_POWER_SENSE, INPUT);
+#endif
 
   // Deselect/disable every unused onboard peripheral before the two display
   // buses start. The RGB LED is common-anode, so HIGH means off.
@@ -2999,8 +3182,18 @@ void loop() {
   service_touch();
 #endif
 
+  const bool previous_external_power = display_state.external_power_present();
+  const bool external_power = external_power_present_now();
   const quota_monitor::DisplayState next_display_state =
-      display_state.update(millis());
+      display_state.update(millis(), external_power);
+  if (external_power != previous_external_power) {
+    // A cable transition restores the normal cadence immediately. Inserting
+    // USB also wakes an offline station instead of waiting for its old backoff.
+    next_fetch_ms = 0;
+    api_backoff_ms = 1000;
+    manual_refresh_gate.request(millis());
+    if (external_power && WiFi.status() != WL_CONNECTED) request_wifi_now();
+  }
   if (next_display_state != applied_display_state) {
     if (next_display_state == quota_monitor::DisplayState::kBacklightOff) {
       const uint32_t seconds = quota_monitor::screen_off_refresh_seconds(

@@ -13,20 +13,36 @@ bool deadline_reached(std::uint32_t now_ms, std::uint32_t deadline_ms) {
 }  // namespace
 
 bool wifi_profile_ssids_valid(std::string_view primary_ssid,
+                              std::string_view backup1_ssid,
+                              std::string_view backup2_ssid) {
+  if (primary_ssid.empty()) return false;
+  if (!backup1_ssid.empty() && backup1_ssid == primary_ssid) return false;
+  if (!backup2_ssid.empty() && backup2_ssid == primary_ssid) return false;
+  return backup1_ssid.empty() || backup2_ssid.empty() ||
+         backup1_ssid != backup2_ssid;
+}
+
+bool wifi_profile_ssids_valid(std::string_view primary_ssid,
                               std::string_view backup_ssid) {
-  return !primary_ssid.empty() &&
-         (backup_ssid.empty() || backup_ssid != primary_ssid);
+  return wifi_profile_ssids_valid(primary_ssid, backup_ssid, {});
 }
 
 void WifiFailoverPolicy::configure(bool primary_available,
-                                   bool backup_available) {
+                                   bool backup1_available,
+                                   bool backup2_available) {
   primary_available_ = primary_available;
-  backup_available_ = backup_available;
+  backup1_available_ = backup1_available;
+  backup2_available_ = backup2_available;
   if (!available(last_good_profile_)) last_good_profile_ = WifiProfile::kNone;
   if (!available(active_profile_)) {
     active_profile_ = WifiProfile::kNone;
     phase_ = Phase::kIdle;
   }
+}
+
+void WifiFailoverPolicy::configure(bool primary_available,
+                                   bool backup_available) {
+  configure(primary_available, backup_available, false);
 }
 
 void WifiFailoverPolicy::begin(std::uint32_t now_ms) {
@@ -35,13 +51,15 @@ void WifiFailoverPolicy::begin(std::uint32_t now_ms) {
 
 bool WifiFailoverPolicy::available(WifiProfile profile) const {
   if (profile == WifiProfile::kPrimary) return primary_available_;
-  if (profile == WifiProfile::kBackup) return backup_available_;
+  if (profile == WifiProfile::kBackup1) return backup1_available_;
+  if (profile == WifiProfile::kBackup2) return backup2_available_;
   return false;
 }
 
 void WifiFailoverPolicy::prepare_round() {
   order_[0] = WifiProfile::kNone;
   order_[1] = WifiProfile::kNone;
+  order_[2] = WifiProfile::kNone;
   order_size_ = 0;
   order_index_ = 0;
 
@@ -53,9 +71,12 @@ void WifiFailoverPolicy::prepare_round() {
     order_[order_size_++] = profile;
   };
 
-  append(last_good_profile_);
+  // last_good_profile_ is deliberately not used for ordering. It records
+  // connection history for diagnostics, while configured priority remains
+  // stable across disconnects and retry rounds.
   append(WifiProfile::kPrimary);
-  append(WifiProfile::kBackup);
+  append(WifiProfile::kBackup1);
+  append(WifiProfile::kBackup2);
 }
 
 WifiFailoverDecision WifiFailoverPolicy::start_current_profile(
@@ -76,7 +97,7 @@ WifiFailoverDecision WifiFailoverPolicy::update(std::uint32_t now_ms,
     return {};
   }
 
-  if (!primary_available_ && !backup_available_) {
+  if (!primary_available_ && !backup1_available_ && !backup2_available_) {
     active_profile_ = WifiProfile::kNone;
     phase_ = Phase::kIdle;
     return {};

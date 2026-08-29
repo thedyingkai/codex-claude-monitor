@@ -5,10 +5,14 @@ v0.3.0 是启用手机配网和 OTA 的首个版本。它必须先通过 USB 数
 WPA2 热点上提供，不是云端管理后台，也不会暴露到设备连接的普通 Wi-Fi。
 
 v0.3.1 在不改变原主 Wi-Fi 配置的前提下增加一组可选备用 Wi-Fi。每组网络最多尝试
-12 秒；整轮失败后按 1、2、4 秒逐步退避，最长 60 秒。连接成功后，本次运行期间会
-优先重试最后成功的网络；手动刷新会清除当前退避并立即开始新一轮连接。
+12 秒；整轮失败后按 1、2、4 秒逐步退避，最长 60 秒。
 
-同一版本还兼容 Claude Code 2.1.220 的文本型 `/usage` 输出，可解析当前会话和
+v0.3.2 再增加备用 Wi-Fi 2，并固定每轮按“主 → 备用 1 → 备用 2”尝试；缺失的备用
+槽位会跳过，整轮失败后的下一轮仍从主网络开始，最后成功记录不会改变优先级。手动
+刷新会清除当前退避并立即开始新一轮连接。该版本还支持在 E32R28T 外接 USB +5V
+检测分压；检测启用且 USB 存在时不会自动降亮或熄屏，拔出 USB 后重新开始计时。
+
+v0.3.1 同时兼容 Claude Code 2.1.220 的文本型 `/usage` 输出，可解析当前会话和
 `Current week (all models)` 周限额。额度主界面的布局及正常蓝/橙配色保持不变；
 中文字体从 Regular 换为 Noto Sans CJK SC Medium 16px，并提高卡片和顶栏不透明度。
 离线或过期数据改用灰色，避免与 Claude 的正常额度颜色混淆。
@@ -20,6 +24,8 @@ v0.3.1 在不改变原主 Wi-Fi 配置的前提下增加一组可选备用 Wi-Fi
 - 正常亮度为 60%；60 秒没有触摸或按键后降到 10%。
 - 300 秒没有操作后把 GPIO21 背光 PWM 设为 0。ESP32、触摸和 Wi-Fi 仍在运行，
   因而“熄屏”不是关机或深度睡眠。
+- 已安装并启用 USB +5V 检测分压时，USB 插着便强制保持正常亮度，不执行前两项
+  省电行为；拔出 USB 后才从零开始计算降亮和熄屏时间。
 - 熄屏时快照周期为正常刷新周期和 60 秒中的较大值。后台刷新不会点亮屏幕。
 - 熄屏后的第一次触摸立即恢复原亮度、清除网络退避并请求刷新；同一次触摸释放
   不会再次触发。亮屏时任意短按请求刷新，1 秒内的重复操作会合并。
@@ -38,11 +44,22 @@ set screen_off_after_seconds 300
 set screen_off_refresh_seconds 60
 set ssid2 BackupWiFi
 set password2 BackupPassword
+set ssid3 BackupWiFi2
+set password3 BackupPassword2
+set external_power_sense_enabled 0
+wifi-promote {"ssid":"NewPrimaryWiFi","password":"NewPrimaryPassword"}
 save
 ```
 
 `brightness_percent` 只接受 30、60 或 100。保存采用带提交标记的事务式写入；启动时
-如果发现上次保存被断电打断，会恢复旧配置。`show` 始终遮蔽 Wi-Fi 密码和显示令牌。
+如果发现上次保存被断电打断，会恢复旧配置。`show` 始终遮蔽三组 Wi-Fi 密码和显示
+令牌。`wifi-promote` 会把给定网络提升为主网络并依次后移原主、备用 1，执行后同样
+需要 `save`。
+
+E32R28T 原板没有可靠的 USB 存在信号。要启用 `external_power_sense_enabled`，须先
+把 P2 pin 1 的 Type-C 原始 `+5V` 经 `100kΩ 1%` 接 GPIO35，再从 GPIO35 经
+`150kΩ 1%` 接 GND；可选从 GPIO35 并联 `100nF` 到 GND。禁止把 +5V 直接接 GPIO35，
+也不能省略 150kΩ 下拉。该设置默认关闭，只有完成并核对接线后才可设为 `1`。
 
 ## 打开临时配网页
 
@@ -58,13 +75,14 @@ save
 
 手机连接热点后访问 `http://192.168.4.1`，可配置：
 
-- 扫描或手工输入主 Wi-Fi，以及可选的备用 Wi-Fi 和各自密码；
+- 扫描或手工输入主 Wi-Fi、备用 Wi-Fi 1、备用 Wi-Fi 2 和各自密码；
 - HTTPS 服务器地址、`display:read` 令牌、时区和快照刷新周期；
 - 正常亮度、降亮时间、熄屏时间和熄屏刷新周期；
+- 是否已安装上述 USB +5V 到 GPIO35 的检测分压；
 - 查看当前固件及服务器最新版本，并在人工确认后安装 OTA。
 
 编辑已有配置时，页面不会返回密码或令牌；SSID 未改时，秘密输入框留空表示保留
-旧密码；SSID 改动或清空时不会错误沿用之前网络的密码。主、备用 SSID 不能相同。
+旧密码；SSID 改动或清空时不会错误沿用之前网络的密码。三组非空 SSID 不能相同。
 提交的新
 配置先只放在内存中，依次测试 Wi-Fi（20 秒）、NTP（15 秒）及 HTTPS/TLS/令牌/
 快照（10 秒）。全部成功才写入 NVS并重启；任何一步失败都会恢复旧连接和旧配置。
@@ -105,7 +123,7 @@ quota-monitor standalone \
 quota-monitor firmware publish \
   --firmware-dir /var/lib/quota-monitor/firmware \
   --board e32r28t \
-  --version 0.3.1 \
+  --version 0.3.2 \
   --file firmware/.pio/build/e32r28t/firmware.bin
 ```
 
@@ -125,7 +143,8 @@ quota-monitor firmware publish \
 ## 设备安装与信任边界
 
 进入配网页时设备才检查 manifest，永不自动安装。安装前必须在页面勾选“已连接稳定
-USB 电源”；E32R28T 无法可靠检测 USB，这个确认不能代替实际接线检查。设备只接受：
+USB 电源”。E32R28T 原板无法可靠检测 USB；可选 GPIO35 分压用于控制显示省电行为，
+但 OTA 的人工确认仍然保留，不能用软件状态代替实际供电检查。设备只接受：
 
 - `board` 为 `e32r28t`，`schemaVersion` 为 1；
 - 严格高于当前版本的三段式版本；

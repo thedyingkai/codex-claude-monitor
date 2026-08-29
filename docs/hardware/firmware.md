@@ -34,6 +34,7 @@ PlatformIO 上传命令以保留 Wi-Fi/API 配置。
 | ILI9341 CS / DC / SCLK / MOSI / MISO / BL | 15 / 2 / 14 / 13 / 12 / 21 |
 | XPT2046 CS / SCLK / MOSI / MISO / IRQ | 33 / 25 / 32 / 39 / 36 |
 | 电池 1:2 分压 ADC | 34 |
+| USB +5V 检测（可选外接分压） | 35 |
 | BOOT 用户键 | 0 |
 | microSD CS（不用，保持高） | 5 |
 | 音频使能（低有效，不用时保持高） | 4 |
@@ -52,6 +53,8 @@ set ssid VALUE
 set password VALUE
 set ssid2 OPTIONAL_BACKUP_VALUE
 set password2 OPTIONAL_BACKUP_VALUE
+set ssid3 OPTIONAL_BACKUP_2_VALUE
+set password3 OPTIONAL_BACKUP_2_VALUE
 set base_url https://quota.example.com
 set token DISPLAY_READ_TOKEN
 set timezone CST-8
@@ -60,17 +63,22 @@ set brightness_percent 60
 set dim_after_seconds 60
 set screen_off_after_seconds 300
 set screen_off_refresh_seconds 60
+set external_power_sense_enabled 0
 save
 test
 portal
+wifi-promote {"ssid":"NEW_PRIMARY","password":"NEW_PASSWORD"}
 factory-reset
 ```
 
-`ssid/password` 是主网络，`ssid2/password2` 是可选备用网络。两组 SSID 不能相同；
-主网络不可为空。固件会在两组网络间自动切换，并优先重试本次运行中最后连接成功的
-一组。`set` 先暂存在内存，`save` 验证后写入 NVS。`show` 会遮蔽两个 Wi-Fi 密码和令牌。
-`portal` 会打开十分钟的临时 WPA2 配网页。E32R28T 没有第二实体键，也没有可靠的
-MCU USB 插入检测；恢复出厂配置仍以串口 `factory-reset` 为准。
+`ssid/password` 是主网络，`ssid2/password2` 和 `ssid3/password3` 分别是可选备用
+网络 1、备用网络 2。三组非空 SSID 不能相同，主网络不可为空。每轮连接严格按
+“主 → 备用 1 → 备用 2”尝试；整轮失败后的下一轮仍从主网络重新开始，最后成功的
+网络只用于状态记录，不会改变优先级。`wifi-promote` 可把给定网络提升为主网络，原
+主网络顺移为备用 1、原备用 1 顺移为备用 2；随后仍需执行 `save` 才会持久化。
+`set` 也只先暂存在内存，`save` 验证后才写入 NVS。`show` 会遮蔽三组 Wi-Fi 密码和
+令牌。`portal` 会打开十分钟的临时 WPA2 配网页。E32R28T 没有第二实体键；恢复出厂
+配置仍以串口 `factory-reset` 为准。
 
 厂家横屏示例的默认触摸校准为 `495,3398,721,3448`。如果实购屏偏移，可运行厂家
 资料包的 `Touch_Calibrate` 示例获得新值，再暂存并保存：
@@ -93,10 +101,22 @@ GPIO34 位于 ADC1，Wi-Fi 工作时仍可使用。固件每 5 秒取 9 个校�
 时和无电池而充电节点悬空时，电压百分比都可能偏差；必须和万用表对比，不把它当
 精密电量计。低于 20% 标红，ADC 无效显示 `N/A`。
 
-E32R28T 没有旧方案的 AP22804 显示负载开关、USB sense 或电源拨杆。v0.3.0 默认
-60 秒无操作降到 10% 亮度、300 秒关闭 GPIO21 背光；触摸、ESP32 和 Wi-Fi 继续
-工作，第一次触摸会亮屏并刷新。它不启用深度睡眠，因此背光关闭不是整机关机。
+E32R28T 没有旧方案的 AP22804 显示负载开关、板载 USB sense 或电源拨杆。v0.3.0
+默认 60 秒无操作降到 10% 亮度、300 秒关闭 GPIO21 背光；触摸、ESP32 和 Wi-Fi
+继续工作，第一次触摸会亮屏并刷新。它不启用深度睡眠，因此背光关闭不是整机关机。
 需要真正关机时应增加经验证的独立电源方案。
+
+v0.3.2 支持一条可选的 USB 存在检测线：从串口排针 P2 的 pin 1 取得 Type-C 原始
+`+5V`，经 `100kΩ 1%` 电阻接到 GPIO35；GPIO35 再经 `150kΩ 1%` 电阻接 GND，
+并可选在 GPIO35 与 GND 之间并联 `100nF` 电容。**禁止把 +5V 直接接到 GPIO35**；
+GPIO35 没有内部上下拉，`150kΩ` 下拉不可省略。未完成并核对这组分压前，必须保持
+`external_power_sense_enabled=0`（默认值），避免读取悬空引脚；接线完成后才可执行
+`set external_power_sense_enabled 1` 和 `save`，也可在临时配网页勾选对应的已安装项。
+
+检测启用且 USB 存在时，固件强制保持正常亮度，不执行自动降亮或熄屏；插入和拔出
+USB 都会清零原无操作计时，拔出后再从头计算 60/300 秒阈值。该检测只判断 Type-C
+供电是否存在，不根据充电芯片的充电阶段推断“正在充电”，因此电池已经充满但 USB
+仍插着时也会保持常亮。
 
 ## 数据与故障显示
 

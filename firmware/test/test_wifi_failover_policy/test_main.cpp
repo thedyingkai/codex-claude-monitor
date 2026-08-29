@@ -21,9 +21,9 @@ void assert_decision(const quota_monitor::WifiFailoverDecision& decision,
   TEST_ASSERT_EQUAL_UINT32(retry_after_ms, decision.retry_after_ms);
 }
 
-void test_primary_then_backup_and_profile_timeout() {
+void test_each_round_tries_primary_then_backup1_then_backup2() {
   quota_monitor::WifiFailoverPolicy policy;
-  policy.configure(true, true);
+  policy.configure(true, true, true);
   policy.begin(100);
 
   assert_decision(policy.update(100, false),
@@ -31,44 +31,67 @@ void test_primary_then_backup_and_profile_timeout() {
   assert_decision(policy.update(12099, false), WifiFailoverAction::kNone,
                   WifiProfile::kNone);
   assert_decision(policy.update(12100, false),
-                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup);
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup1);
   assert_decision(policy.update(24100, false),
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup2);
+  assert_decision(policy.update(36100, false),
                   WifiFailoverAction::kRoundFailed, WifiProfile::kNone, 1000);
-  assert_decision(policy.update(25099, false), WifiFailoverAction::kNone,
+  assert_decision(policy.update(37099, false), WifiFailoverAction::kNone,
                   WifiProfile::kNone);
-  assert_decision(policy.update(25100, false),
+  assert_decision(policy.update(37100, false),
                   WifiFailoverAction::kStartProfile, WifiProfile::kPrimary);
+  assert_decision(policy.update(49100, false),
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup1);
+  assert_decision(policy.update(61100, false),
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup2);
 }
 
-void test_last_good_profile_is_tried_first_after_disconnect() {
+void test_last_good_is_recorded_but_does_not_override_primary_priority() {
   quota_monitor::WifiFailoverPolicy policy;
-  policy.configure(true, true);
+  policy.configure(true, true, true);
   policy.begin(0);
 
   assert_decision(policy.update(0, false), WifiFailoverAction::kStartProfile,
                   WifiProfile::kPrimary);
   assert_decision(policy.update(12000, false),
-                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup);
-  policy.update(12500, true);
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(WifiProfile::kBackup),
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup1);
+  assert_decision(policy.update(24000, false),
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup2);
+  policy.update(24500, true);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(WifiProfile::kBackup2),
                         static_cast<int>(policy.last_good_profile()));
 
-  assert_decision(policy.update(13000, false),
-                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup);
   assert_decision(policy.update(25000, false),
                   WifiFailoverAction::kStartProfile, WifiProfile::kPrimary);
+  assert_decision(policy.update(37000, false),
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup1);
+  assert_decision(policy.update(49000, false),
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup2);
 }
 
 void test_note_connected_supports_an_externally_identified_profile() {
   quota_monitor::WifiFailoverPolicy policy;
-  policy.configure(true, true);
+  policy.configure(true, true, true);
   policy.begin(0);
-  policy.note_connected(WifiProfile::kBackup);
+  policy.note_connected(WifiProfile::kBackup2);
 
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(WifiProfile::kBackup),
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(WifiProfile::kBackup2),
                         static_cast<int>(policy.last_good_profile()));
   assert_decision(policy.update(10, false),
-                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup);
+                  WifiFailoverAction::kStartProfile, WifiProfile::kPrimary);
+}
+
+void test_absent_profiles_are_skipped_without_reordering_the_rest() {
+  quota_monitor::WifiFailoverPolicy policy;
+  policy.configure(true, false, true);
+  policy.begin(0);
+
+  assert_decision(policy.update(0, false), WifiFailoverAction::kStartProfile,
+                  WifiProfile::kPrimary);
+  assert_decision(policy.update(12000, false),
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup2);
+  assert_decision(policy.update(24000, false),
+                  WifiFailoverAction::kRoundFailed, WifiProfile::kNone, 1000);
 }
 
 void test_whole_round_backoff_doubles_and_caps_at_sixty_seconds() {
@@ -143,17 +166,41 @@ void test_single_profile_is_not_repeated_inside_a_failed_round() {
                   WifiFailoverAction::kStartProfile, WifiProfile::kPrimary);
 }
 
-void test_duplicate_ssid_validation_helper() {
-  TEST_ASSERT_TRUE(quota_monitor::wifi_profile_ssids_valid("home", ""));
+void test_three_profile_ssid_validation_helper() {
   TEST_ASSERT_TRUE(
-      quota_monitor::wifi_profile_ssids_valid("home", "phone-hotspot"));
+      quota_monitor::wifi_profile_ssids_valid("home", "", ""));
+  TEST_ASSERT_TRUE(
+      quota_monitor::wifi_profile_ssids_valid("home", "phone", "office"));
+  TEST_ASSERT_TRUE(
+      quota_monitor::wifi_profile_ssids_valid("home", "", "office"));
+  TEST_ASSERT_FALSE(
+      quota_monitor::wifi_profile_ssids_valid("home", "home", "office"));
+  TEST_ASSERT_FALSE(
+      quota_monitor::wifi_profile_ssids_valid("home", "phone", "home"));
+  TEST_ASSERT_FALSE(
+      quota_monitor::wifi_profile_ssids_valid("home", "phone", "phone"));
+  TEST_ASSERT_FALSE(
+      quota_monitor::wifi_profile_ssids_valid("", "phone", "office"));
+}
+
+void test_two_profile_api_remains_compatible() {
+  TEST_ASSERT_TRUE(quota_monitor::wifi_profile_ssids_valid("home", "phone"));
   TEST_ASSERT_FALSE(quota_monitor::wifi_profile_ssids_valid("home", "home"));
-  TEST_ASSERT_FALSE(quota_monitor::wifi_profile_ssids_valid("", "backup"));
+
+  quota_monitor::WifiFailoverPolicy policy;
+  policy.configure(true, true);
+  policy.begin(0);
+  assert_decision(policy.update(0, false), WifiFailoverAction::kStartProfile,
+                  WifiProfile::kPrimary);
+  assert_decision(policy.update(12000, false),
+                  WifiFailoverAction::kStartProfile, WifiProfile::kBackup);
+  assert_decision(policy.update(24000, false),
+                  WifiFailoverAction::kRoundFailed, WifiProfile::kNone, 1000);
 }
 
 void test_no_profiles_produces_no_action() {
   quota_monitor::WifiFailoverPolicy policy;
-  policy.configure(false, false);
+  policy.configure(false, false, false);
   policy.begin(0);
   assert_decision(policy.update(0, false), WifiFailoverAction::kNone,
                   WifiProfile::kNone);
@@ -163,14 +210,16 @@ void test_no_profiles_produces_no_action() {
 
 int main(int, char**) {
   UNITY_BEGIN();
-  RUN_TEST(test_primary_then_backup_and_profile_timeout);
-  RUN_TEST(test_last_good_profile_is_tried_first_after_disconnect);
+  RUN_TEST(test_each_round_tries_primary_then_backup1_then_backup2);
+  RUN_TEST(test_last_good_is_recorded_but_does_not_override_primary_priority);
   RUN_TEST(test_note_connected_supports_an_externally_identified_profile);
+  RUN_TEST(test_absent_profiles_are_skipped_without_reordering_the_rest);
   RUN_TEST(test_whole_round_backoff_doubles_and_caps_at_sixty_seconds);
   RUN_TEST(test_manual_reset_is_immediate_and_restores_initial_backoff);
   RUN_TEST(test_millis_wrap_is_safe_for_timeout_and_retry_deadline);
   RUN_TEST(test_single_profile_is_not_repeated_inside_a_failed_round);
-  RUN_TEST(test_duplicate_ssid_validation_helper);
+  RUN_TEST(test_three_profile_ssid_validation_helper);
+  RUN_TEST(test_two_profile_api_remains_compatible);
   RUN_TEST(test_no_profiles_produces_no_action);
   return UNITY_END();
 }

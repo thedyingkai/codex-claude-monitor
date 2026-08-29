@@ -6,9 +6,14 @@
 namespace quota_monitor {
 
 enum class WifiProfile : std::uint8_t {
-  kNone,
+  kNone = 0,
   kPrimary,
-  kBackup,
+  kBackup1,
+  kBackup2,
+
+  // Compatibility alias for callers that have not yet migrated from the
+  // original two-profile policy. New code should use kBackup1 explicitly.
+  kBackup = kBackup1,
 };
 
 enum class WifiFailoverAction : std::uint8_t {
@@ -30,9 +35,14 @@ constexpr std::uint32_t kWifiProfileTimeoutMs = 12000U;
 constexpr std::uint32_t kWifiInitialRoundBackoffMs = 1000U;
 constexpr std::uint32_t kWifiMaximumRoundBackoffMs = 60000U;
 
-// The primary SSID is required. The backup SSID is optional, but when present
-// it must differ from the primary so a profile can be identified unambiguously
-// after the ESP32 reports a successful connection.
+// The primary SSID is required. Backup SSIDs are independently optional. Every
+// populated SSID must be unique so the connected profile can be identified
+// unambiguously after the ESP32 reports a successful connection.
+bool wifi_profile_ssids_valid(std::string_view primary_ssid,
+                              std::string_view backup1_ssid,
+                              std::string_view backup2_ssid);
+
+// Compatibility overload for the original primary/backup configuration.
 bool wifi_profile_ssids_valid(std::string_view primary_ssid,
                               std::string_view backup_ssid);
 
@@ -42,6 +52,12 @@ bool wifi_profile_ssids_valid(std::string_view primary_ssid,
 // wrap-safe because the largest interval is much less than 2^31 ms.
 class WifiFailoverPolicy {
  public:
+  // Availability is supplied in fixed priority order. Every connection round
+  // starts at primary, then tries backup1 and backup2, skipping absent entries.
+  void configure(bool primary_available, bool backup1_available,
+                 bool backup2_available);
+
+  // Compatibility overload for the original primary/backup configuration.
   void configure(bool primary_available, bool backup_available);
   void begin(std::uint32_t now_ms);
 
@@ -52,8 +68,8 @@ class WifiFailoverPolicy {
   // currently active attempt.
   void note_connected(WifiProfile profile);
 
-  // Cancels an active/waiting round, restores the one-second initial backoff,
-  // and makes the last-good-first profile immediately eligible. The caller
+  // Cancels an active/waiting round and restores the one-second initial
+  // backoff. The next update starts a new primary-first round. The caller
   // should disconnect the current station attempt before applying the next
   // kStartProfile decision.
   void manual_reset(std::uint32_t now_ms);
@@ -75,9 +91,11 @@ class WifiFailoverPolicy {
   WifiFailoverDecision start_current_profile(std::uint32_t now_ms);
 
   bool primary_available_ = false;
-  bool backup_available_ = false;
+  bool backup1_available_ = false;
+  bool backup2_available_ = false;
   Phase phase_ = Phase::kIdle;
-  WifiProfile order_[2] = {WifiProfile::kNone, WifiProfile::kNone};
+  WifiProfile order_[3] = {WifiProfile::kNone, WifiProfile::kNone,
+                           WifiProfile::kNone};
   std::uint8_t order_size_ = 0;
   std::uint8_t order_index_ = 0;
   WifiProfile active_profile_ = WifiProfile::kNone;
