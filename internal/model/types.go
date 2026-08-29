@@ -31,9 +31,13 @@ const (
 // LimitWindow is intentionally provider-neutral. Providers generally expose
 // used percentage, while clients want both used and remaining values.
 type LimitWindow struct {
-	UsedPercent      float64   `json:"usedPercent"`
-	RemainingPercent float64   `json:"remainingPercent"`
-	ResetsAt         time.Time `json:"resetsAt"`
+	UsedPercent      float64 `json:"usedPercent"`
+	RemainingPercent float64 `json:"remainingPercent"`
+	// ResetsAt is nil when the provider reports a fully available quota window
+	// that has not started yet. Claude Code uses this shape for a 0%-used
+	// current session and does not invent a reset time until the first model
+	// request starts the rolling five-hour window.
+	ResetsAt *time.Time `json:"resetsAt"`
 }
 
 type ProviderWindows struct {

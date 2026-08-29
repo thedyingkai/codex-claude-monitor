@@ -9,6 +9,7 @@ namespace quota_monitor {
 
 struct RateWindow {
   bool present = false;
+  bool has_reset = false;
   float used_percent = 0.0F;
   float remaining_percent = 0.0F;
   std::string resets_at;

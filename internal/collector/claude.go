@@ -333,17 +333,18 @@ func unixTimestamp(value int64) time.Time {
 }
 
 var (
-	ansiPattern          = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
-	percentPattern       = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*%\s*(?:used)?`)
-	timestampPattern     = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})`)
-	resetPhrasePattern   = regexp.MustCompile(`(?i)\bresets?\s+(.+?)\s*$`)
-	relativeResetPattern = regexp.MustCompile(`(?i)^in\s+(.+?)\s*$`)
-	relativeResetPart    = regexp.MustCompile(`(?i)(\d+)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)`)
-	absoluteResetPattern = regexp.MustCompile(`(?i)^([a-z]+)\s+(\d{1,2})(?:,\s*(\d{4}))?(?:,\s*|\s+at\s+)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s*\(([^)]+)\))?$`)
-	currentWeekHeading   = regexp.MustCompile(`(?i)^\s*current\s+week(?:\s*\(([^)]*)\))?(?:\s*:|\s*$)`)
-	modelOnlyHeading     = regexp.MustCompile(`(?i)^\s*[^:]{1,80}\bonly(?:\s*:|\s*$)`)
-	fiveHourHeading      = regexp.MustCompile(`(?i)^\s*(?:current\s+session|5h|5\s*hours?|5-hour)(?:\s+(?:limit|usage))?(?:\s*:|\s*$)`)
-	sevenDayHeading      = regexp.MustCompile(`(?i)^\s*(?:all\s+models|7d|7\s*days?|7-day|weekly\s+limits?)(?:\s*:|\s*$)`)
+	ansiPattern           = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
+	percentPattern        = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*%\s*(?:used)?`)
+	timestampPattern      = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})`)
+	resetPhrasePattern    = regexp.MustCompile(`(?i)\bresets?\s+(.+?)\s*$`)
+	relativeResetPattern  = regexp.MustCompile(`(?i)^in\s+(.+?)\s*$`)
+	relativeResetPart     = regexp.MustCompile(`(?i)(\d+)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)`)
+	absoluteResetPattern  = regexp.MustCompile(`(?i)^([a-z]+)\s+(\d{1,2})(?:,\s*(\d{4}))?(?:,\s*|\s+at\s+)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s*\(([^)]+)\))?$`)
+	currentWeekHeading    = regexp.MustCompile(`(?i)^\s*current\s+week(?:\s*\(([^)]*)\))?(?:\s*:|\s*$)`)
+	modelOnlyHeading      = regexp.MustCompile(`(?i)^\s*[^:]{1,80}\bonly(?:\s*:|\s*$)`)
+	currentSessionHeading = regexp.MustCompile(`(?i)^\s*current\s+session(?:\s+(?:limit|usage))?(?:\s*:|\s*$)`)
+	fiveHourHeading       = regexp.MustCompile(`(?i)^\s*(?:current\s+session|5h|5\s*hours?|5-hour)(?:\s+(?:limit|usage))?(?:\s*:|\s*$)`)
+	sevenDayHeading       = regexp.MustCompile(`(?i)^\s*(?:all\s+models|7d|7\s*days?|7-day|weekly\s+limits?)(?:\s*:|\s*$)`)
 )
 
 const (
@@ -356,13 +357,26 @@ func stripANSI(value string) string { return ansiPattern.ReplaceAllString(value,
 func parseClaudeUsageText(text string, observedAt time.Time) (model.ProviderReport, error) {
 	report := model.ProviderReport{ObservedAt: observedAt.UTC(), AuthState: "authenticated", Source: "claude-usage", Windows: model.ProviderWindows{}}
 	type pendingWindow struct {
-		kind  string
-		used  *float64
-		reset *time.Time
+		kind                      string
+		allowInactiveWithoutReset bool
+		used                      *float64
+		reset                     *time.Time
 	}
 	pending := pendingWindow{}
 	commit := func() {
-		if pending.used == nil || pending.reset == nil {
+		if pending.used == nil {
+			return
+		}
+		// Claude Code omits the reset timestamp after a five-hour session has
+		// reset and before the next real model request starts a new rolling
+		// window. Preserve that exact 0%-used state as a full, not-yet-started
+		// window. A non-zero window without a reset remains invalid rather than
+		// receiving a fabricated timestamp.
+		if pending.reset == nil {
+			if pending.kind == "five" && pending.allowInactiveWithoutReset && *pending.used == 0 {
+				window := model.LimitWindow{UsedPercent: 0, RemainingPercent: 100}
+				report.Windows.FiveHour = &window
+			}
 			return
 		}
 		window := normalizeWindow(*pending.used, *pending.reset)
@@ -377,7 +391,10 @@ func parseClaudeUsageText(text string, observedAt time.Time) (model.ProviderRepo
 		lower := strings.ToLower(line)
 		if kind, isHeading := classifyClaudeUsageHeading(line); isHeading {
 			commit()
-			pending = pendingWindow{kind: kind}
+			pending = pendingWindow{
+				kind:                      kind,
+				allowInactiveWithoutReset: kind == "five" && currentSessionHeading.MatchString(line),
+			}
 		}
 		if pending.kind == "" {
 			continue
@@ -629,7 +646,13 @@ func MergeProviderReports(a, b model.ProviderReport) model.ProviderReport {
 }
 
 func reusableWindow(window *model.LimitWindow, observedAt time.Time) bool {
-	return window != nil && !window.ResetsAt.IsZero() && window.ResetsAt.After(observedAt)
+	if window == nil {
+		return false
+	}
+	if window.ResetsAt == nil {
+		return window.UsedPercent == 0 && window.RemainingPercent == 100
+	}
+	return !window.ResetsAt.IsZero() && window.ResetsAt.After(observedAt)
 }
 
 func objectValue(object map[string]any, keys ...string) any {

@@ -150,6 +150,40 @@ func TestAgentReportAndDisplaySnapshotEndToEnd(t *testing.T) {
 	}
 }
 
+func TestInactiveWindowRoundTripsWithNullReset(t *testing.T) {
+	f := newServerFixture(t, nil)
+	report := validReport(f.now)
+	report.Providers[model.ProviderClaude] = model.ProviderReport{
+		ObservedAt: f.now,
+		AuthState:  "authenticated",
+		Plan:       "pro",
+		Source:     "claude-usage",
+		Windows: model.ProviderWindows{
+			FiveHour: &model.LimitWindow{UsedPercent: 0, RemainingPercent: 100},
+		},
+	}
+	response := postReport(f, f.agentToken, report)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("report status = %d, body = %s", response.Code, response.Body.String())
+	}
+
+	response = serve(f.handler, http.MethodGet, "/api/v1/display/snapshot", f.displayToken, nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("snapshot status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"fiveHour":{"usedPercent":0,"remainingPercent":100,"resetsAt":null}`) {
+		t.Fatalf("snapshot did not preserve nullable reset: %s", response.Body.String())
+	}
+	var snapshot model.DisplaySnapshot
+	if err := json.Unmarshal(response.Body.Bytes(), &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	fiveHour := snapshot.Providers[model.ProviderClaude].Windows.FiveHour
+	if fiveHour == nil || fiveHour.UsedPercent != 0 || fiveHour.RemainingPercent != 100 || fiveHour.ResetsAt != nil {
+		t.Fatalf("inactive window = %+v", fiveHour)
+	}
+}
+
 func TestDisplaySnapshotExposesLoginRequired(t *testing.T) {
 	f := newServerFixture(t, nil)
 	report := validReport(f.now)
@@ -352,9 +386,15 @@ func TestValidateAgentReport(t *testing.T) {
 		{name: "sum", mutate: func(r *model.AgentReport) {
 			r.Providers[model.ProviderCodex] = providerWithPercent(now, 10, 80)
 		}},
-		{name: "missing resets", mutate: func(r *model.AgentReport) {
+		{name: "nonzero missing resets", mutate: func(r *model.AgentReport) {
 			provider := providerWithPercent(now, 10, 90)
-			provider.Windows.FiveHour.ResetsAt = time.Time{}
+			provider.Windows.FiveHour.ResetsAt = nil
+			r.Providers[model.ProviderCodex] = provider
+		}},
+		{name: "zero reset timestamp", mutate: func(r *model.AgentReport) {
+			provider := providerWithPercent(now, 10, 90)
+			zero := time.Time{}
+			provider.Windows.FiveHour.ResetsAt = &zero
 			r.Providers[model.ProviderCodex] = provider
 		}},
 		{name: "duplicate task", mutate: func(r *model.AgentReport) {
@@ -451,6 +491,7 @@ func validReport(now time.Time) model.AgentReport {
 }
 
 func providerWithPercent(now time.Time, used, remaining float64) model.ProviderReport {
+	reset := now.Add(5 * time.Hour)
 	return model.ProviderReport{
 		ObservedAt: now,
 		Plan:       "plus",
@@ -459,7 +500,7 @@ func providerWithPercent(now time.Time, used, remaining float64) model.ProviderR
 			FiveHour: &model.LimitWindow{
 				UsedPercent:      used,
 				RemainingPercent: remaining,
-				ResetsAt:         now.Add(5 * time.Hour),
+				ResetsAt:         &reset,
 			},
 		},
 	}

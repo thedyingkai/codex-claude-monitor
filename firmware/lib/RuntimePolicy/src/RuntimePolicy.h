@@ -68,4 +68,11 @@ class RefreshGate {
 std::uint32_t screen_off_refresh_seconds(std::uint32_t normal_seconds,
                                          std::uint32_t configured_seconds);
 
+// The inferred/observed external-power override has highest priority: while
+// charging, the display is deliberately driven at full duty regardless of the
+// configured normal brightness or inactivity state.
+std::uint8_t desired_backlight_pwm(DisplayState state,
+                                   std::uint8_t configured_percent,
+                                   bool battery_savings_bypass);
+
 }  // namespace quota_monitor

@@ -456,7 +456,7 @@ func preferCodexWindow(candidate, current codexWindowChoice) bool {
 	if candidate.window.UsedPercent != current.window.UsedPercent {
 		return candidate.window.UsedPercent > current.window.UsedPercent
 	}
-	return candidate.window.ResetsAt.Before(current.window.ResetsAt)
+	return candidate.window.ResetsAt.Before(*current.window.ResetsAt)
 }
 
 func stableCodexPlan(limits rateLimitsResponse) string {
@@ -530,10 +530,11 @@ func normalizeWindow(used float64, resetsAt time.Time) model.LimitWindow {
 	if used > 100 {
 		used = 100
 	}
+	resetUTC := resetsAt.UTC()
 	return model.LimitWindow{
 		UsedPercent:      used,
 		RemainingPercent: 100 - used,
-		ResetsAt:         resetsAt.UTC(),
+		ResetsAt:         &resetUTC,
 	}
 }
 

@@ -61,10 +61,6 @@ bool read_window(JsonVariantConst value, RateWindow& output,
             ".usedPercent and .remainingPercent are required numbers";
     return false;
   }
-  if (!obj["resetsAt"].is<const char*>()) {
-    error = std::string(path) + ".resetsAt is required";
-    return false;
-  }
   const float used = obj["usedPercent"].as<float>();
   const float remaining = obj["remainingPercent"].as<float>();
   if (!finite_percent(used) || !finite_percent(remaining)) {
@@ -76,14 +72,36 @@ bool read_window(JsonVariantConst value, RateWindow& output,
     return false;
   }
 
-  output.resets_at = obj["resetsAt"].as<const char*>();
-  if (output.resets_at.empty()) {
+  JsonVariantConst resets_at = obj["resetsAt"];
+  if (resets_at.isUnbound()) {
     error = std::string(path) + ".resetsAt is required";
     return false;
   }
-  if (!parse_rfc3339(output.resets_at, output.resets_at_epoch, error)) {
-    error = std::string(path) + ".resetsAt: " + error;
-    return false;
+  if (resets_at.isNull()) {
+    // Claude omits the reset timestamp when a freshly reset five-hour window
+    // has not started yet. Only the unambiguous 0%-used state may use null;
+    // accepting a partially consumed window without a reset would hide a
+    // collector or schema error.
+    if (std::fabs(used) > 0.01F || std::fabs(remaining - 100.0F) > 0.01F) {
+      error = std::string(path) +
+              ".resetsAt may be null only for an unused window";
+      return false;
+    }
+  } else {
+    if (!resets_at.is<const char*>()) {
+      error = std::string(path) + ".resetsAt must be RFC3339 text or null";
+      return false;
+    }
+    output.resets_at = resets_at.as<const char*>();
+    if (output.resets_at.empty()) {
+      error = std::string(path) + ".resetsAt must not be empty";
+      return false;
+    }
+    if (!parse_rfc3339(output.resets_at, output.resets_at_epoch, error)) {
+      error = std::string(path) + ".resetsAt: " + error;
+      return false;
+    }
+    output.has_reset = true;
   }
 
   output.present = true;
@@ -215,7 +233,10 @@ void write_window(JsonObject windows, const char* key,
   JsonObject output = windows[key].to<JsonObject>();
   output["usedPercent"] = window.used_percent;
   output["remainingPercent"] = window.remaining_percent;
-  output["resetsAt"] = window.resets_at;
+  if (window.has_reset)
+    output["resetsAt"] = window.resets_at;
+  else
+    output["resetsAt"] = nullptr;
 }
 
 void write_provider(JsonObject output, const ProviderSnapshot& provider) {

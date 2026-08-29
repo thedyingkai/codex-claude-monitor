@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init"}
+{"type":"result","subtype":"success","is_error":false,"result":"Plan usage limits\nCurrent session: 0% used\nCurrent week (all models): 100% used · resets Sep 1, 8:59pm (UTC)"}
