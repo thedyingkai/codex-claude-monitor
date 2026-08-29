@@ -347,6 +347,8 @@ set ssid YourWiFiName
 set password YourWiFiPassword
 set ssid2 OptionalBackupWiFi
 set password2 OptionalBackupPassword
+set ssid3 OptionalBackupWiFi2
+set password3 OptionalBackupPassword2
 set base_url https://monitor.example.com
 set token qmon_REPLACE_WITH_DISPLAY_TOKEN
 set timezone CST-8
@@ -355,21 +357,33 @@ set brightness_percent 60
 set dim_after_seconds 60
 set screen_off_after_seconds 300
 set screen_off_refresh_seconds 60
+set external_power_sense_enabled 0
 save
 test
 ```
 
 `ssid/password` 是必需的主网络；`ssid2/password2` 是 v0.3.1 起可选的备用网络，
-不需要备用时可省略。两组 SSID 不能相同。设备连接失败时会自动轮换，并在本次运行
-期间优先重试最后成功的网络。`base_url` 也可包含完整 `/api/v1/display/snapshot`
-路径；固件会避免重复追加。`refresh_seconds` 范围是 5–3600 秒，默认 15 秒。`show`
-会遮蔽两个 Wi-Fi 密码和令牌；`save` 前的修改只在内存中，必须执行 `save` 才会写入
-NVS。`factory-reset` 会清空 Wi-Fi/API 配置并重启，无法恢复。
+`ssid3/password3` 是 v0.3.2 起可选的备用网络 2，不需要的槽位可省略。三组非空
+SSID 不能相同。设备每轮严格按“主 → 备用 1 → 备用 2”尝试，下一轮仍从主网络开始；
+最后成功的网络不会改变这个优先级。也可输入
+`wifi-promote {"ssid":"NewPrimary","password":"NewPassword"}`，把新网络提升为主网络、
+原主网络和备用 1 依次后移，随后执行 `save`。`base_url` 也可包含完整
+`/api/v1/display/snapshot` 路径；固件会避免重复追加。`refresh_seconds` 范围是
+5–3600 秒，默认 15 秒。`show` 会遮蔽三组 Wi-Fi 密码和令牌；`save` 前的修改只在
+内存中，必须执行 `save` 才会写入 NVS。`factory-reset` 会清空 Wi-Fi/API 配置并
+重启，无法恢复。
 
 运行时可短按板上 BOOT 键立即刷新，按住 1.2–5 秒查看诊断，持续 5 秒打开手机
 配网页。亮屏时触摸任意位置都会刷新，长按左/右半屏分别显示网络诊断/设备信息；
 熄屏后的第一次触摸会立即恢复亮度并刷新。E32R28T 没有旧方案的独立电源拨杆和
 第二实体按键，因此恢复出厂配置以串口 `factory-reset` 为准。
+
+E32R28T 原板没有 USB 存在检测。v0.3.2 可选从串口排针 P2 pin 1 的 Type-C 原始
+`+5V` 经 `100kΩ 1%` 接到 GPIO35，再从 GPIO35 经 `150kΩ 1%` 接 GND；可选从
+GPIO35 并联 `100nF` 到 GND。禁止把 +5V 直接接 GPIO35，也不能省略 150kΩ 下拉。
+完成并核对接线后，执行 `set external_power_sense_enabled 1` 和 `save`；默认值 `0`
+必须保留到接线完成。启用后，USB 插着时不会自动降亮或熄屏，拔出后重新开始无操作
+计时。电池充满但 USB 仍插着时同样保持常亮。
 
 确认 USB 下屏幕、触摸和串口均正常后，拔掉 Type-C 并核对电池极性，再插入带保护板的 3.7V/1S、MX1.25-2P 成品电池。不要热插时强推插头，不要焊电芯极耳。完整步骤见[硬件装配说明](hardware/assembly.md)。
 

@@ -41,8 +41,28 @@ void DisplayStateMachine::leave_forced_mode(std::uint32_t now_ms) {
 }
 
 DisplayState DisplayStateMachine::update(std::uint32_t now_ms) {
+  return update(now_ms, external_power_present_);
+}
+
+DisplayState DisplayStateMachine::update(std::uint32_t now_ms,
+                                         bool external_power_present) {
+  if (external_power_present != external_power_present_) {
+    external_power_present_ = external_power_present;
+    // Inserting or removing external power starts a new inactivity period. In
+    // particular, unplugging does not inherit the time spent on external
+    // power, so dim/off thresholds start at zero on that edge.
+    last_activity_ms_ = now_ms;
+  }
+
   if (state_ == DisplayState::kPortal || state_ == DisplayState::kOta)
     return state_;
+
+  // While externally powered there is no reason to apply battery-saving
+  // states. Forced modes above retain priority and their distinct state.
+  if (external_power_present_) {
+    state_ = DisplayState::kAwake;
+    return state_;
+  }
 
   const std::uint32_t idle_ms = now_ms - last_activity_ms_;
   if (policy_.off_after_seconds != 0 &&

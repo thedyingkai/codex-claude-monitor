@@ -27,9 +27,15 @@ class DisplayStateMachine {
   void enter_portal(std::uint32_t now_ms);
   void enter_ota(std::uint32_t now_ms);
   void leave_forced_mode(std::uint32_t now_ms);
+  // The two-argument overload is intended for the main loop: pass the latest
+  // external-power sample on every iteration. It detects both edges and
+  // restarts the inactivity timer. The legacy overload retains the last
+  // sampled power state.
   DisplayState update(std::uint32_t now_ms);
+  DisplayState update(std::uint32_t now_ms, bool external_power_present);
 
   DisplayState state() const { return state_; }
+  bool external_power_present() const { return external_power_present_; }
   std::uint32_t idle_milliseconds(std::uint32_t now_ms) const {
     return now_ms - last_activity_ms_;
   }
@@ -38,6 +44,7 @@ class DisplayStateMachine {
   DisplayPolicy policy_{};
   DisplayState state_ = DisplayState::kAwake;
   std::uint32_t last_activity_ms_ = 0;
+  bool external_power_present_ = false;
 };
 
 // Coalesces repeated manual refreshes and imposes a one-second admission

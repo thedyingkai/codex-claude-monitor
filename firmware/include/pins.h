@@ -8,6 +8,7 @@
 
 #define QUOTA_HAS_MAX17048 0
 #define QUOTA_HAS_CARRIER_POWER 0
+#define QUOTA_HAS_EXTERNAL_POWER_SENSE 1
 #define QUOTA_HAS_SECOND_BUTTON 0
 #define QUOTA_HAS_TOUCH 1
 
@@ -26,6 +27,9 @@ constexpr int PIN_TOUCH_MISO = 39;
 constexpr int PIN_TOUCH_CS = 33;
 constexpr int PIN_TOUCH_IRQ = 36;  // Active low; input-only GPIO.
 constexpr int PIN_BATTERY_ADC = 34;
+// Optional USB +5 V detector input. GPIO35 must only be enabled after the
+// documented 100k/150k divider and external pulldown are installed.
+constexpr int PIN_EXTERNAL_POWER_SENSE = 35;
 
 constexpr int PIN_SD_CS = 5;
 constexpr int PIN_EXTERNAL_SPI_CS = 27;
@@ -39,6 +43,7 @@ constexpr int PIN_BUTTON_A = 0;  // BOOT button; only use after firmware boot.
 
 #define QUOTA_HAS_MAX17048 1
 #define QUOTA_HAS_CARRIER_POWER 1
+#define QUOTA_HAS_EXTERNAL_POWER_SENSE 0
 #define QUOTA_HAS_SECOND_BUTTON 1
 #define QUOTA_HAS_TOUCH 0
 
