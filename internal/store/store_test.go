@@ -358,11 +358,7 @@ func providerReport(observedAt time.Time, used float64) model.ProviderReport {
 		Plan:       "pro",
 		Source:     "test",
 		Windows: model.ProviderWindows{
-			FiveHour: &model.LimitWindow{
-				UsedPercent:      used,
-				RemainingPercent: 100 - used,
-				ResetsAt:         observedAt.Add(5 * time.Hour),
-			},
+			FiveHour: model.NewLimitWindow(used, observedAt.Add(5*time.Hour)),
 		},
 	}
 }

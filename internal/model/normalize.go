@@ -19,10 +19,11 @@ func ClampPercent(value float64) float64 {
 
 func NewLimitWindow(used float64, resetsAt time.Time) *LimitWindow {
 	used = ClampPercent(used)
+	resetUTC := resetsAt.UTC()
 	return &LimitWindow{
 		UsedPercent:      used,
 		RemainingPercent: 100 - used,
-		ResetsAt:         resetsAt.UTC(),
+		ResetsAt:         &resetUTC,
 	}
 }
 

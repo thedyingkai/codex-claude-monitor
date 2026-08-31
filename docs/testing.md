@@ -18,7 +18,7 @@ npx --yes @redocly/cli@1.34.5 lint api/openapi.yaml
 当前单元/集成测试覆盖的主要行为包括：
 
 - Codex app-server 初始化、RPC 调用、断线重连、超时、300/10080 分钟窗口映射与未知窗口；
-- Claude `/usage` NDJSON/渲染文本、Claude Code 2.1.220 的英文绝对重置时间、`resets in 17h6m` 相对时间、跨年日期、statusLine 结构、缺失窗口、未登录命令返回非零但 stdout 有效；
+- Claude `/usage` NDJSON/渲染文本、Claude Code 2.1.220 的英文绝对重置时间、`resets in 17h6m` 相对时间、跨年日期、statusLine 结构、缺失窗口、5h 尚未开始时的 0% 已用/100% 剩余/null 重置，以及未登录命令返回非零但 stdout 有效；
 - 明确断言 Claude 采集命令只有 `-p /usage`，并带无会话持久化和探测标记；
 - Hooks 事件最小化、回环限制、共享密钥、探测排除、重复安装、卸载恢复和损坏配置拒绝；
 - 主任务/子任务生命周期、心跳、无 ID 的子任务结束与 15 分钟孤儿失效；
@@ -79,7 +79,9 @@ file dist/quota-monitor-*
 - 5 分钟前的额度样本为 `stale`，完全没有样本为 `unavailable`；
 - 空数据库快照的 `unavailable` provider 必须省略 `observedAt`，不得编码成
   `0001-01-01T00:00:00Z`；固件应接受该快照并显示 `N/A`；
-- 5h/7d 分别测试缺失、0%、100%、重置前后与解析失败；
+- 5h/7d 分别测试缺失、0%、100%、重置前后与解析失败；Claude 5h 尚未开始时必须
+  保留为 `usedPercent: 0`、`remainingPercent: 100`、`resetsAt: null`，而非缺失窗口；
+  非零用量却缺少重置时间的窗口必须拒绝；
 - 客户端时间向未来偏移超过 5 分钟或报告年龄超过 15 分钟时被拒绝。
 
 跨重置测试应使用可控时钟或固定 RFC3339 样本，避免依赖真实等待。
@@ -136,6 +138,9 @@ quota-monitor agent --config /absolute/path/to/agent.json --once
 
 - `/usage` 是本地 slash command；采集器没有添加第二段普通提示词；
 - stream-json 中真实 Pro/Max 5h/7d 数据能被解析；当前版本可能不提供结构化 `rate_limits`，而把 `Current session`、`Current week (all models)` 和人类可读重置时间放在 `result` 文本中，缺失窗口仍应保持 `null`；
+- 若 `Current session` 明确显示 0% 已用且没有重置倒计时，API 必须返回 0% 已用、
+  100% 剩余和 `resetsAt: null` 的有效 5h 窗口；屏幕显示 `剩100%`、`重置 未开始`，
+  不显示 `N/A`；
 - API 的 used/remaining 百分比和重置时间与 CLI 显示一致；
 - 开启常驻 Agent 并进入 Claude 交互会话后，statusLine 数据能更新/回退；
 - 原 status line 的 stdout 仍显示，失败不会阻断 Claude；
@@ -192,17 +197,27 @@ test "$headroom_bytes" -ge 131072
 
 Windows PowerShell 使用 `.\.tools\pio-venv\Scripts\pio.exe` 替换上述 `pio` 路径。
 
+`native` 测试还应覆盖 v0.3.3 的 GPIO34 充电趋势推断：平稳/噪声、瞬时尖峰和背光
+回弹不得误触发；快速/缓慢持续上升应触发；短暂波动不得解除，持续下降应解除；
+无效 ADC、`millis()` 回卷以及推断或 GPIO35 检测成立时始终输出 100% PWM也必须覆盖。
+快照解析测试应覆盖 Claude 未开始 5h 窗口的 null 重置往返，以及非零用量缺少重置
+时间时拒绝。
+
 目标板构建成功只证明编译与链接。烧录后还应验证：
 
 - schema v1 正常、未知字段可忽略、错误 schema/损坏 JSON 被拒绝；
 - `generatedAt` 过旧、明显位于未来和重放旧快照时被拒绝或明确标为过期；
-- 5h/7d 缺失、0%、100%、低于 20%、过期和重置时间显示；
+- 5h/7d 缺失、0%、100%、低于 20%、过期和重置时间显示；Claude 未开始的 5h
+  窗口应显示 `剩100%`、`重置 未开始`；
 - Wi-Fi 丢失、DNS/TLS/API 失败时保留缓存并退避，离线重启后仍显示 NVS 中的上次
   快照并标为过期，网络恢复后自动刷新；
 - 服务器证书错误必须失败，不能静默降级；
 - NVS 损坏/恢复、串口 `show/set/test/save/factory-reset` 与秘密遮蔽；
 - `AWAKE/DIMMED/BACKLIGHT_OFF/PORTAL/OTA` 阈值、禁用值、`millis()` 回卷、亮度恢复、
   熄屏刷新不点亮、触摸唤醒并刷新以及 1 秒请求合并；
+- GPIO34 持续上升推断成立时强制 100% PWM且禁用降亮/熄屏，持续下降解除后重新
+  开始空闲计时；稳定/满电、开机即插电时不得把缺乏趋势证据误写成已检测到 USB；
+  安装并启用 GPIO35 分压后，真实 VBUS 存在路径在这些场景仍应可靠；
 - 同步 HTTPS 已移出 LVGL 主循环；在十秒请求超时期间触摸仍应在 200 ms 内亮屏；
 - E32R28T 的 BOOT 短按/1.2–5 秒/5 秒长按、左右触摸区长按、三档亮度和串口
   `factory-reset`；BOOT 在复位时保持低电平会进入下载模式，不能当作开机复位组合键；
@@ -239,6 +254,11 @@ OTA 断电测试必须在可恢复的 USB/串口条件下进行，不能连接�
 - 板型/修订、Type-C/CH340C 上传、ILI9341 颜色与横屏方向；
 - XPT2046 四角/中心校准、左右触摸区和 BOOT 运行时按键；
 - GPIO34 在电池供电、USB 充电和满电三种状态下与万用表的误差；
+- 在 USB 充电产生快速或缓慢上升趋势时验证 GPIO34 推断、100% PWM和省电旁路；拔出
+  后验证只有持续下降才解除并重启空闲计时，同时记录稳定电压、满电和开机即插电
+  可能无法推断的预期盲区；
+- 安装可选 GPIO35 分压后，分别验证插入、拔出、满电和开机即插电的 VBUS 真检测；
+  未安装时保持该功能关闭，且不得声称原板可直接检测 USB；
 - MX1.25-2P 机械匹配、板端 `+/-` 丝印、电池实际线序和保护板资料；
 - USB-only、battery-only、USB+battery、低电与掉电恢复；
 - 30/60/100% 亮度功耗、充电电流/温升，以及 60% 亮度、15 秒刷新至少 8 小时续航；
@@ -263,7 +283,8 @@ OTA 断电测试必须在可恢复的 USB/串口条件下进行，不能连接�
 - [ ] 用户完成 Claude OAuth 后，`/usage` 与 statusLine 双通道通过；
 - [ ] Hooks 重复安装/卸载及原配置恢复通过；
 - [ ] Windows 登录任务与 Linux `systemd --user` 重启恢复通过；
-- [ ] E32R28T 与旧目标均编译，E32 烧录、触摸、断网/TLS/NVS/按键测试通过；
+- [ ] E32R28T 与旧目标均编译，E32 烧录、触摸、断网/TLS/NVS/按键测试通过；GPIO34
+  趋势推断和可选 GPIO35 VBUS 真检测的省电旁路、100% PWM与拔出恢复均通过；
 - [ ] E32 固件小于 1,966,080 字节并保留至少 128 KiB，手机配网与 OTA/自动回滚通过；
 - [ ] E32R28T、电池、MX1.25 极性、绝缘和外壳 3D/实物干涉复核通过；
 - [ ] 充电温升、三档亮度功耗、续航与整机尺寸/重量实测通过；

@@ -94,4 +94,15 @@ std::uint32_t screen_off_refresh_seconds(std::uint32_t normal_seconds,
                                  std::max(normal_seconds, configured_seconds));
 }
 
+std::uint8_t desired_backlight_pwm(DisplayState state,
+                                   std::uint8_t configured_percent,
+                                   bool battery_savings_bypass) {
+  if (battery_savings_bypass) return 255U;
+  if (state == DisplayState::kBacklightOff) return 0U;
+  if (state == DisplayState::kDimmed) return 26U;
+  const std::uint16_t bounded_percent =
+      std::min<std::uint16_t>(configured_percent, 100U);
+  return static_cast<std::uint8_t>((bounded_percent * 255U + 50U) / 100U);
+}
+
 }  // namespace quota_monitor

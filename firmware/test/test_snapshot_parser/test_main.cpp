@@ -72,6 +72,39 @@ void test_rejects_incomplete_window() {
   TEST_ASSERT_NOT_EQUAL(std::string::npos, error.find("remainingPercent"));
 }
 
+void test_accepts_not_started_window_and_cache_roundtrip() {
+  const char* json = R"JSON({"schemaVersion":1,"generatedAt":"2026-08-29T13:00:00Z","providers":{"codex":{"freshness":"unavailable","windows":{"fiveHour":null,"sevenDay":null}},"claude":{"observedAt":"2026-08-29T13:00:00Z","freshness":"fresh","plan":"pro","windows":{"fiveHour":{"usedPercent":0,"remainingPercent":100,"resetsAt":null},"sevenDay":{"usedPercent":100,"remainingPercent":0,"resetsAt":"2026-09-01T20:59:00Z"}}}},"tasks":{"codex":{"main":0,"sub":0},"claude":{"main":0,"sub":0},"total":{"main":0,"sub":0}},"agents":{"online":1,"total":1},"warnings":[]})JSON";
+  Snapshot value;
+  std::string error;
+  TEST_ASSERT_TRUE_MESSAGE(parse_snapshot(json, std::strlen(json), value, error),
+                           error.c_str());
+  TEST_ASSERT_TRUE(value.claude.five_hour.present);
+  TEST_ASSERT_FALSE(value.claude.five_hour.has_reset);
+  TEST_ASSERT_FLOAT_WITHIN(0.01F, 100.0F,
+                           value.claude.five_hour.remaining_percent);
+
+  std::string cached;
+  TEST_ASSERT_TRUE_MESSAGE(serialize_snapshot_cache(value, cached, error),
+                           error.c_str());
+  TEST_ASSERT_NOT_EQUAL(std::string::npos, cached.find("\"resetsAt\":null"));
+  Snapshot restored;
+  TEST_ASSERT_TRUE_MESSAGE(
+      parse_snapshot(cached.data(), cached.size(), restored, error),
+      error.c_str());
+  TEST_ASSERT_TRUE(restored.claude.five_hour.present);
+  TEST_ASSERT_FALSE(restored.claude.five_hour.has_reset);
+  TEST_ASSERT_FLOAT_WITHIN(0.01F, 100.0F,
+                           restored.claude.five_hour.remaining_percent);
+}
+
+void test_rejects_nonzero_window_without_reset() {
+  const char* json = R"JSON({"schemaVersion":1,"generatedAt":"2026-08-29T13:00:00Z","providers":{"codex":{"freshness":"unavailable","windows":{"fiveHour":null,"sevenDay":null}},"claude":{"observedAt":"2026-08-29T13:00:00Z","freshness":"fresh","windows":{"fiveHour":{"usedPercent":34,"remainingPercent":66,"resetsAt":null},"sevenDay":null}}},"tasks":{"codex":{"main":0,"sub":0},"claude":{"main":0,"sub":0},"total":{"main":0,"sub":0}},"agents":{"online":1,"total":1},"warnings":[]})JSON";
+  Snapshot value;
+  std::string error;
+  TEST_ASSERT_FALSE(parse_snapshot(json, std::strlen(json), value, error));
+  TEST_ASSERT_NOT_EQUAL(std::string::npos, error.find("unused window"));
+}
+
 void test_rfc3339_and_time_policy() {
   std::int64_t utc = 0;
   std::int64_t offset = 0;
@@ -130,6 +163,8 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_full_snapshot);
   RUN_TEST(test_rejects_incomplete_window);
+  RUN_TEST(test_accepts_not_started_window_and_cache_roundtrip);
+  RUN_TEST(test_rejects_nonzero_window_without_reset);
   RUN_TEST(test_rejects_bad_schema_and_percent);
   RUN_TEST(test_rejects_missing_required_sections_and_bad_totals);
   RUN_TEST(test_rfc3339_and_time_policy);

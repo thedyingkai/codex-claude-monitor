@@ -113,7 +113,7 @@ func TestAgentReportsFullStateWithBearerToken(t *testing.T) {
 		writer.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
-	five := model.LimitWindow{UsedPercent: 20, RemainingPercent: 80, ResetsAt: time.Now().Add(time.Hour)}
+	five := *model.NewLimitWindow(20, time.Now().Add(time.Hour))
 	codex := &staticCollector{report: model.ProviderReport{ObservedAt: time.Now(), Source: "fixture", Windows: model.ProviderWindows{FiveHour: &five}}}
 	agent, err := New(Config{AgentID: "host-1", ServerURL: server.URL, Token: "token", AllowInsecureHTTP: true, Codex: codex})
 	if err != nil {
@@ -131,7 +131,7 @@ func TestAgentReportsFullStateWithBearerToken(t *testing.T) {
 func TestAgentReportsDirectlyToStandaloneSink(t *testing.T) {
 	var received model.AgentReport
 	var statusProvider model.ProviderName
-	five := model.LimitWindow{UsedPercent: 25, RemainingPercent: 75, ResetsAt: time.Now().Add(time.Hour)}
+	five := *model.NewLimitWindow(25, time.Now().Add(time.Hour))
 	instance, err := New(Config{
 		AgentID: "cloud-standalone",
 		Codex: &staticCollector{report: model.ProviderReport{
@@ -391,7 +391,7 @@ func TestAgentNeverFollowsReportRedirect(t *testing.T) {
 func TestAgentClearsClaudeWindowsWhenLogoutIsObserved(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer server.Close()
-	five := model.LimitWindow{UsedPercent: 10, RemainingPercent: 90, ResetsAt: time.Now().Add(time.Hour)}
+	five := *model.NewLimitWindow(10, time.Now().Add(time.Hour))
 	adapter := &staticCollector{report: model.ProviderReport{
 		ObservedAt: time.Now(), AuthState: "authenticated", Windows: model.ProviderWindows{FiveHour: &five},
 	}}

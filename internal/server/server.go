@@ -458,8 +458,14 @@ func validateWindow(window *model.LimitWindow, name string) error {
 	if math.Abs((window.UsedPercent+window.RemainingPercent)-100) > 0.01 {
 		return fmt.Errorf("%s usedPercent and remainingPercent must sum to 100", name)
 	}
+	if window.ResetsAt == nil {
+		if window.UsedPercent != 0 || window.RemainingPercent != 100 {
+			return fmt.Errorf("%s resetsAt may be null only for an unused window", name)
+		}
+		return nil
+	}
 	if window.ResetsAt.IsZero() {
-		return fmt.Errorf("%s resetsAt is required", name)
+		return fmt.Errorf("%s resetsAt must be a valid timestamp or null", name)
 	}
 	return nil
 }

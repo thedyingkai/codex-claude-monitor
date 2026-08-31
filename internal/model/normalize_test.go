@@ -1,7 +1,9 @@
 package model
 
 import (
+	"encoding/json"
 	"math"
+	"strings"
 	"testing"
 	"time"
 )
@@ -39,7 +41,26 @@ func TestNewLimitWindow(t *testing.T) {
 	if window.UsedPercent != 12.25 || window.RemainingPercent != 87.75 {
 		t.Fatalf("unexpected percentages: %#v", window)
 	}
-	if window.ResetsAt.Location() != time.UTC {
+	if window.ResetsAt == nil || window.ResetsAt.Location() != time.UTC {
 		t.Fatalf("reset time must be normalized to UTC: %v", window.ResetsAt)
+	}
+}
+
+func TestInactiveLimitWindowJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+	want := LimitWindow{UsedPercent: 0, RemainingPercent: 100}
+	payload, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"resetsAt":null`) {
+		t.Fatalf("JSON must retain the required nullable field: %s", payload)
+	}
+	var got LimitWindow
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.UsedPercent != 0 || got.RemainingPercent != 100 || got.ResetsAt != nil {
+		t.Fatalf("round trip = %+v", got)
 	}
 }

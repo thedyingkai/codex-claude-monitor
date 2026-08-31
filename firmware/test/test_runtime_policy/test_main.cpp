@@ -1,5 +1,7 @@
 #include <unity.h>
 
+#include <initializer_list>
+
 #include "RuntimePolicy.h"
 
 using quota_monitor::DisplayState;
@@ -140,6 +142,35 @@ void test_screen_off_refresh_floor() {
   TEST_ASSERT_EQUAL_UINT32(120, quota_monitor::screen_off_refresh_seconds(15, 120));
 }
 
+void test_charging_forces_full_backlight_for_every_configured_brightness() {
+  for (const std::uint8_t percent : {30U, 60U, 100U}) {
+    TEST_ASSERT_EQUAL_UINT8(
+        255U, quota_monitor::desired_backlight_pwm(
+                  DisplayState::kAwake, percent, true));
+    TEST_ASSERT_EQUAL_UINT8(
+        255U, quota_monitor::desired_backlight_pwm(
+                  DisplayState::kDimmed, percent, true));
+    TEST_ASSERT_EQUAL_UINT8(
+        255U, quota_monitor::desired_backlight_pwm(
+                  DisplayState::kBacklightOff, percent, true));
+  }
+}
+
+void test_backlight_pwm_follows_state_when_not_charging() {
+  TEST_ASSERT_EQUAL_UINT8(
+      77U, quota_monitor::desired_backlight_pwm(DisplayState::kAwake, 30U,
+                                                false));
+  TEST_ASSERT_EQUAL_UINT8(
+      153U, quota_monitor::desired_backlight_pwm(DisplayState::kPortal, 60U,
+                                                 false));
+  TEST_ASSERT_EQUAL_UINT8(
+      26U, quota_monitor::desired_backlight_pwm(DisplayState::kDimmed, 100U,
+                                                false));
+  TEST_ASSERT_EQUAL_UINT8(
+      0U, quota_monitor::desired_backlight_pwm(DisplayState::kBacklightOff,
+                                               100U, false));
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_display_thresholds_and_disabled_values);
@@ -150,5 +181,7 @@ int main(int, char**) {
   RUN_TEST(test_external_power_edges_are_wrap_safe);
   RUN_TEST(test_millis_wrap_and_refresh_coalescing);
   RUN_TEST(test_screen_off_refresh_floor);
+  RUN_TEST(test_charging_forces_full_backlight_for_every_configured_brightness);
+  RUN_TEST(test_backlight_pwm_follows_state_when_not_charging);
   return UNITY_END();
 }

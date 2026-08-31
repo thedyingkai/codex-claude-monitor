@@ -107,7 +107,7 @@ Compose 把数据库和 `/data/firmware` 一起保存在 `monitor-data` 卷中�
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml run --rm --no-deps \
   -v "$PWD/firmware/.pio/build/e32r28t/firmware.bin:/tmp/firmware.bin:ro" \
   monitor firmware publish --firmware-dir /data/firmware \
-  --board e32r28t --version 0.3.0 --file /tmp/firmware.bin
+  --board e32r28t --version 0.3.3 --file /tmp/firmware.bin
 ```
 
 Windows 应把 `-v` 左侧换成 `firmware.bin` 的绝对路径。不要通过 Caddy/nginx 增加上传
@@ -378,12 +378,18 @@ SSID 不能相同。设备每轮严格按“主 → 备用 1 → 备用 2”尝�
 熄屏后的第一次触摸会立即恢复亮度并刷新。E32R28T 没有旧方案的独立电源拨杆和
 第二实体按键，因此恢复出厂配置以串口 `factory-reset` 为准。
 
-E32R28T 原板没有 USB 存在检测。v0.3.2 可选从串口排针 P2 pin 1 的 Type-C 原始
-`+5V` 经 `100kΩ 1%` 接到 GPIO35，再从 GPIO35 经 `150kΩ 1%` 接 GND；可选从
-GPIO35 并联 `100nF` 到 GND。禁止把 +5V 直接接 GPIO35，也不能省略 150kΩ 下拉。
-完成并核对接线后，执行 `set external_power_sense_enabled 1` 和 `save`；默认值 `0`
-必须保留到接线完成。启用后，USB 插着时不会自动降亮或熄屏，拔出后重新开始无操作
-计时。电池充满但 USB 仍插着时同样保持常亮。
+E32R28T 原板没有可直接读取的 USB/VBUS 存在信号。v0.3.3 默认根据 GPIO34 电池
+电压的持续上升趋势保守推断充电状态；推断成立时，背光强制使用 100% PWM，并停用
+自动降亮和熄屏。拔出后要等持续下降趋势解除推断，随后无操作计时才从零重新开始。
+稳定或已充满的电池、以及开机前就已插着 USB 的情况没有可靠的上升基线，因此这条
+路径不能保证识别，也不能称为 USB 检测。
+
+需要可靠判断 VBUS 时，v0.3.2 起可选从串口排针 P2 pin 1 的 Type-C 原始 `+5V`
+经 `100kΩ 1%` 接到 GPIO35，再从 GPIO35 经 `150kΩ 1%` 接 GND；可选从 GPIO35
+并联 `100nF` 到 GND。禁止把 +5V 直接接 GPIO35，也不能省略 150kΩ 下拉。完成并
+核对接线后，执行 `set external_power_sense_enabled 1` 和 `save`；默认值 `0` 必须
+保留到接线完成。GPIO35 确认 USB 存在时同样强制 100% PWM并停用省电行为，拔出后
+重新开始无操作计时；该路径不依赖充电阶段，满电或开机即插电时仍可靠。
 
 确认 USB 下屏幕、触摸和串口均正常后，拔掉 Type-C 并核对电池极性，再插入带保护板的 3.7V/1S、MX1.25-2P 成品电池。不要热插时强推插头，不要焊电芯极耳。完整步骤见[硬件装配说明](hardware/assembly.md)。
 
@@ -391,7 +397,8 @@ GPIO35 并联 `100nF` 到 GND。禁止把 +5V 直接接 GPIO35，也不能省略
 所有必填对象和计数字段、额度百分比合计、RFC3339 重置/观测时间以及 Agent 汇总
 关系；未知扩展字段会忽略。API/Wi-Fi 失败时保留缓存值；最近的规范化快照也会
 限频写入 NVS，所以离线重启后仍可显示，并按服务器 `generatedAt` 的真实年龄
-标为过期。固件同时拒绝未来时间和重放/回滚快照。
+标为过期。Claude 尚未开始的 5h 窗口是受限例外：只有 0% 已用、100% 剩余时才允许
+`resetsAt: null`，并显示 `重置 未开始`。固件同时拒绝未来时间和重放/回滚快照。
 
 v0.3.0 没有有效配置时会自动创建临时 WPA2 热点；已有配置时可长按 BOOT 5 秒或
 串口输入 `portal`。手机连接屏幕显示的 `QMON-XXXXXX` 和随机密码，再访问
@@ -423,6 +430,6 @@ claude -p "/usage" --output-format stream-json --verbose --no-session-persistenc
 quota-monitor agent --config /absolute/path/to/agent.json --once
 ```
 
-再读取显示快照，检查 `providers.claude.source`、`observedAt`、`fiveHour`/`sevenDay` 与 Claude 实际显示一致。随后启动一次交互式 Claude 会话，让 status line 更新，再次读取快照，确认双通道没有出现明显冲突。某个订阅确实不提供某一窗口时，`null`/`N/A` 是正确结果。
+再读取显示快照，检查 `providers.claude.source`、`observedAt`、`fiveHour`/`sevenDay` 与 Claude 实际显示一致。若当前 5h 会话尚未开始，`fiveHour` 应是 `usedPercent: 0`、`remainingPercent: 100`、`resetsAt: null` 的有效对象，屏幕显示 `剩100%` 和 `重置 未开始`，不能误报为 `N/A`。随后启动一次交互式 Claude 会话，让 status line 更新，再次读取快照，确认双通道没有出现明显冲突。某个订阅确实不提供某一窗口时，`null`/`N/A` 才是正确结果。
 
 真实账号字段会随 Claude Code 版本或订阅类型变化；若 `/usage` 能显示配额但 API 为 `unavailable`，请保留已脱敏的结构和 CLI 版本用于兼容性修复，绝不要提交账号标识、提示词或 OAuth 凭据。

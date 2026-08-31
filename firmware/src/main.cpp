@@ -35,6 +35,7 @@
 #include <utility>
 
 #include "BatteryEstimate.h"
+#include "ChargeTrendDetector.h"
 #include "DisplayText.h"
 #include "ExternalPowerSense.h"
 #include "SnapshotParser.h"
@@ -245,13 +246,19 @@ quota_monitor::DigitalPresenceFilter external_power_filter{300U};
 bool have_persisted_snapshot_cache = false;
 float cached_battery_soc = -1.0F;
 float cached_battery_voltage = -1.0F;
+uint16_t cached_battery_mv = 0;
 bool cached_battery_ok = false;
 uint32_t next_battery_sample_ms = 0;
+#if defined(QUOTA_BOARD_E32R28T)
+quota_monitor::ChargeTrendDetector charge_trend_detector;
+#endif
 
 quota_monitor::DisplayStateMachine display_state;
 quota_monitor::WifiFailoverPolicy wifi_failover_policy;
 quota_monitor::DisplayState applied_display_state =
     quota_monitor::DisplayState::kAwake;
+uint8_t applied_backlight_pwm = 0;
+bool backlight_pwm_initialized = false;
 quota_monitor::RefreshGate manual_refresh_gate;
 bool fetch_in_flight = false;
 uint32_t restart_after_ota_ms = 0;
@@ -447,6 +454,16 @@ void sample_battery_if_due() {
       static_cast<int32_t>(millis() - next_battery_sample_ms) < 0)
     return;
   read_battery(cached_battery_soc, cached_battery_voltage, cached_battery_ok);
+  cached_battery_mv =
+      cached_battery_ok
+          ? static_cast<uint16_t>(std::clamp(
+                static_cast<int>(cached_battery_voltage * 1000.0F + 0.5F),
+                0, 65535))
+          : 0U;
+#if defined(QUOTA_BOARD_E32R28T)
+  charge_trend_detector.update(millis(), cached_battery_mv, cached_battery_ok,
+                               applied_backlight_pwm);
+#endif
   next_battery_sample_ms = millis() + 5000U;
 }
 
@@ -457,6 +474,16 @@ String masked(const String& value) {
 
 bool brightness_allowed(uint32_t value) {
   return value == 30 || value == 60 || value == 100;
+}
+
+void apply_backlight_pwm(uint8_t pwm) {
+  if (backlight_pwm_initialized && applied_backlight_pwm == pwm) return;
+#if defined(QUOTA_BOARD_E32R28T)
+  charge_trend_detector.note_load_transition(millis(), pwm);
+#endif
+  ledcWrite(0, pwm);
+  applied_backlight_pwm = pwm;
+  backlight_pwm_initialized = true;
 }
 
 void normalize_config(DeviceConfig& value) {
@@ -1043,7 +1070,8 @@ void set_bar(lv_obj_t* label, lv_obj_t* bar,
   }
   const int remaining = std::clamp(
       static_cast<int>(window.remaining_percent + 0.5F), 0, 100);
-  const String reset = local_reset_time(window.resets_at_epoch);
+  const String reset =
+      window.has_reset ? local_reset_time(window.resets_at_epoch) : "未开始";
   const std::string reset_line =
       quota_monitor::format_reset_line(reset.c_str());
   // The card's content width is only 136 px. Keep the percentage and reset
@@ -1571,16 +1599,10 @@ bool portal_session_valid() {
 void portal_touch() {
   portal_last_activity_ms = millis();
   const OtaStatus status = copy_ota_status();
-  const DeviceConfig current_config = copy_config();
   if (status.installing)
     display_state.enter_ota(millis());
   else
     display_state.enter_portal(millis());
-  ledcWrite(0, static_cast<uint8_t>(
-                   (static_cast<uint16_t>(current_config.brightness_percent) *
-                        255U +
-                    50U) /
-                   100U));
 }
 
 bool require_portal_get() {
@@ -2499,6 +2521,18 @@ void print_config() {
                 current_config.external_power_sense_enabled ? "yes" : "no");
   Serial.printf("external_power_present=%s\n",
                 display_state.external_power_present() ? "yes" : "no");
+  if (cached_battery_ok)
+    Serial.printf("battery_voltage_mv=%u\n", cached_battery_mv);
+  else
+    Serial.println("battery_voltage_mv=N/A");
+#if defined(QUOTA_BOARD_E32R28T)
+  Serial.printf("charging_inferred=%s\n",
+                charge_trend_detector.charging() ? "yes" : "no");
+#else
+  Serial.println("charging_inferred=no");
+#endif
+  Serial.printf("battery_savings_bypass=%s\n",
+                display_state.external_power_present() ? "yes" : "no");
 #if QUOTA_HAS_TOUCH
   Serial.printf("touch_cal=%u,%u,%u,%u\n", current_config.touch_x_min,
                 current_config.touch_x_max, current_config.touch_y_min,
@@ -2822,12 +2856,6 @@ void change_brightness() {
   }
   config_dirty = true;
   display_state.note_activity(millis());
-  ledcWrite(0, static_cast<uint8_t>(
-                   (static_cast<uint16_t>(
-                        current_config.brightness_percent) *
-                        255U +
-                    50U) /
-                   100U));
   show_message(String("亮度 ") + String(current_config.brightness_percent) +
                    "%",
                2000);
@@ -2851,14 +2879,7 @@ void service_button(ButtonState& button, void (*short_action)(),
 }
 
 void manual_refresh() {
-  const DeviceConfig current_config = copy_config();
   display_state.note_activity(millis());
-  ledcWrite(0, static_cast<uint8_t>(
-                   (static_cast<uint16_t>(
-                        current_config.brightness_percent) *
-                        255U +
-                    50U) /
-                   100U));
   bool network_reserved = false;
   {
     SharedStateLock lock;
@@ -2929,10 +2950,6 @@ void service_touch() {
     const bool was_off = display_state.state() ==
                          quota_monitor::DisplayState::kBacklightOff;
     display_state.note_activity(millis());
-    ledcWrite(0, static_cast<uint8_t>(
-                     (static_cast<uint16_t>(config.brightness_percent) * 255U +
-                      50U) /
-                     100U));
     touch_state.swallow_release = was_off;
     if (was_off) manual_refresh();
     touch_state.down_since = millis();
@@ -2962,14 +2979,7 @@ void service_boot_button() {
   if (down && !button.last_down) {
     const bool was_off = display_state.state() ==
                          quota_monitor::DisplayState::kBacklightOff;
-    const DeviceConfig current_config = copy_config();
     display_state.note_activity(millis());
-    ledcWrite(0, static_cast<uint8_t>(
-                     (static_cast<uint16_t>(
-                          current_config.brightness_percent) *
-                          255U +
-                      50U) /
-                     100U));
     button.swallow_release = was_off;
     if (was_off) manual_refresh();
     button.down_since = millis();
@@ -3107,10 +3117,8 @@ void setup() {
   // afterwards so the selected 60% startup brightness is not overwritten.
   ledcSetup(0, 20000, 8);
   ledcAttachPin(PIN_LCD_BACKLIGHT, 0);
-  ledcWrite(0, static_cast<uint8_t>(
-                   (static_cast<uint16_t>(config.brightness_percent) * 255U +
-                    50U) /
-                   100U));
+  apply_backlight_pwm(quota_monitor::desired_backlight_pwm(
+      quota_monitor::DisplayState::kAwake, config.brightness_percent, false));
 #if QUOTA_HAS_TOUCH
   // TFT_eSPI uses the ESP32's default VSPI controller. The touch controller is
   // physically wired to a separate pin set, so give it HSPI explicitly.
@@ -3183,7 +3191,13 @@ void loop() {
 #endif
 
   const bool previous_external_power = display_state.external_power_present();
-  const bool external_power = external_power_present_now();
+  const bool physical_external_power = external_power_present_now();
+#if defined(QUOTA_BOARD_E32R28T)
+  const bool inferred_charging = charge_trend_detector.charging();
+#else
+  constexpr bool inferred_charging = false;
+#endif
+  const bool external_power = physical_external_power || inferred_charging;
   const quota_monitor::DisplayState next_display_state =
       display_state.update(millis(), external_power);
   if (external_power != previous_external_power) {
@@ -3200,15 +3214,11 @@ void loop() {
           config.refresh_seconds, config.screen_off_refresh_seconds);
       next_fetch_ms = millis() + seconds * 1000UL;
     }
-    uint8_t pwm = static_cast<uint8_t>(
-        (static_cast<uint16_t>(config.brightness_percent) * 255U + 50U) /
-        100U);
-    if (next_display_state == quota_monitor::DisplayState::kDimmed) pwm = 26;
-    if (next_display_state == quota_monitor::DisplayState::kBacklightOff)
-      pwm = 0;
-    ledcWrite(0, pwm);
     applied_display_state = next_display_state;
   }
+  const DeviceConfig current_config = copy_config();
+  apply_backlight_pwm(quota_monitor::desired_backlight_pwm(
+      next_display_state, current_config.brightness_percent, external_power));
 
   if (manual_refresh_gate.take_if_ready(millis(), fetch_in_flight))
     next_fetch_ms = 0;

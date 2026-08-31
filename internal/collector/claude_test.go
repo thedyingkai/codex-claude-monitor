@@ -75,6 +75,48 @@ func TestParseClaudeUsageCurrentHeadlessText(t *testing.T) {
 	}
 }
 
+func TestParseClaudeUsageInactiveCurrentSession(t *testing.T) {
+	payload, err := os.ReadFile("testdata/claude-usage-inactive-session.ndjson")
+	if err != nil {
+		t.Fatal(err)
+	}
+	observedAt := time.Date(2026, time.August, 29, 12, 0, 0, 0, time.UTC)
+	report, err := ParseClaudeUsage(payload, observedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Windows.FiveHour == nil {
+		t.Fatal("inactive five-hour window is missing")
+	}
+	if report.Windows.FiveHour.UsedPercent != 0 || report.Windows.FiveHour.RemainingPercent != 100 {
+		t.Fatalf("inactive five-hour percentages = %+v", report.Windows.FiveHour)
+	}
+	if report.Windows.FiveHour.ResetsAt != nil {
+		t.Fatalf("inactive five-hour reset = %v, want nil", report.Windows.FiveHour.ResetsAt)
+	}
+	if report.Windows.SevenDay == nil || report.Windows.SevenDay.UsedPercent != 100 {
+		t.Fatalf("unexpected seven-day window: %+v", report.Windows.SevenDay)
+	}
+	wantReset := time.Date(2026, time.September, 1, 20, 59, 0, 0, time.UTC)
+	if report.Windows.SevenDay.ResetsAt == nil || !report.Windows.SevenDay.ResetsAt.Equal(wantReset) {
+		t.Fatalf("seven-day reset = %v, want %s", report.Windows.SevenDay.ResetsAt, wantReset)
+	}
+}
+
+func TestParseClaudeUsageRejectsNonzeroSessionWithoutReset(t *testing.T) {
+	payload := []byte("{\"type\":\"result\",\"result\":\"Plan usage limits\\nCurrent session: 34% used\"}\n")
+	if _, err := ParseClaudeUsage(payload, time.Date(2026, time.August, 29, 12, 0, 0, 0, time.UTC)); err == nil {
+		t.Fatal("non-zero current session without a reset was accepted")
+	}
+}
+
+func TestParseClaudeUsageDoesNotGeneralizeMissingResetToOtherFiveHourLabels(t *testing.T) {
+	payload := []byte("{\"type\":\"result\",\"result\":\"5h: 0% used\"}\n")
+	if _, err := ParseClaudeUsage(payload, time.Date(2026, time.August, 29, 12, 0, 0, 0, time.UTC)); err == nil {
+		t.Fatal("generic five-hour label without a reset was accepted")
+	}
+}
+
 func TestParseClaudeUsageRelativeWeeklyLimit(t *testing.T) {
 	payload := []byte("{\"type\":\"result\",\"result\":\"Current session\\n12% used\\nResets in 4h26m\\nWeekly limits\\nAll models\\n43% used\\nResets in 6d17h6m\\nCurrent week (Opus only)\\n99% used\\nResets in 1d\"}\n")
 	observedAt := time.Date(2026, time.August, 25, 3, 0, 0, 0, time.UTC)
@@ -263,6 +305,16 @@ func TestMergeProviderReportsDoesNotCarryWindowPastReset(t *testing.T) {
 	merged := MergeProviderReports(old, newer)
 	if merged.Windows.FiveHour != nil {
 		t.Fatalf("expired window was carried forward: %+v", merged.Windows.FiveHour)
+	}
+}
+
+func TestMergeProviderReportsCarriesInactiveWindowWithoutReset(t *testing.T) {
+	inactive := model.LimitWindow{UsedPercent: 0, RemainingPercent: 100}
+	old := modelReport(time.Unix(10, 0), &inactive, nil)
+	newer := modelReport(time.Unix(20, 0), nil, nil)
+	merged := MergeProviderReports(old, newer)
+	if merged.Windows.FiveHour == nil || merged.Windows.FiveHour.ResetsAt != nil || merged.Windows.FiveHour.RemainingPercent != 100 {
+		t.Fatalf("inactive window was not carried forward: %+v", merged.Windows.FiveHour)
 	}
 }
 

@@ -154,10 +154,17 @@ components:
       type: object
       additionalProperties: false
       required: [usedPercent, remainingPercent, resetsAt]
+      description: >-
+        A provider quota window. resetsAt is null only when a fully unused
+        rolling window has not started yet; in that state usedPercent is 0 and
+        remainingPercent is 100.
       properties:
         usedPercent: {type: number, minimum: 0, maximum: 100}
         remainingPercent: {type: number, minimum: 0, maximum: 100}
-        resetsAt: {type: string, format: date-time}
+        resetsAt:
+          oneOf:
+            - {type: string, format: date-time}
+            - {type: 'null'}
     ProviderWindows:
       type: object
       additionalProperties: false
