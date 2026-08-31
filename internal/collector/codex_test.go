@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -141,6 +142,251 @@ func TestCodexCollectorHandshakeAndCollect(t *testing.T) {
 	}
 }
 
+type codexHelperTraceEvent struct {
+	Generation   int    `json:"generation"`
+	Method       string `json:"method"`
+	RefreshToken *bool  `json:"refreshToken,omitempty"`
+}
+
+func newTracedCodexCollector(t *testing.T, mode string) (*CodexCollector, string) {
+	t.Helper()
+	directory := t.TempDir()
+	tracePath := filepath.Join(directory, "trace.jsonl")
+	statePath := filepath.Join(directory, "generation")
+	c := NewCodex(CodexConfig{
+		Command: os.Args[0], Args: []string{"-test.run=TestCodexHelperProcess", "--"},
+		Env: []string{
+			"GO_WANT_CODEX_HELPER=" + mode,
+			"CODEX_HELPER_STATE=" + statePath,
+			"CODEX_HELPER_TRACE=" + tracePath,
+		},
+		Timeout: 3 * time.Second,
+	})
+	t.Cleanup(func() { _ = c.Close() })
+	return c, tracePath
+}
+
+func readCodexHelperTrace(t *testing.T, path string) []codexHelperTraceEvent {
+	t.Helper()
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read Codex helper trace: %v", err)
+	}
+	var events []codexHelperTraceEvent
+	scanner := bufio.NewScanner(strings.NewReader(string(payload)))
+	for scanner.Scan() {
+		var event codexHelperTraceEvent
+		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+			t.Fatalf("decode Codex helper trace line %q: %v", scanner.Text(), err)
+		}
+		events = append(events, event)
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("scan Codex helper trace: %v", err)
+	}
+	return events
+}
+
+func codexTraceEventsByMethod(events []codexHelperTraceEvent, method string) []codexHelperTraceEvent {
+	var selected []codexHelperTraceEvent
+	for _, event := range events {
+		if event.Method == method {
+			selected = append(selected, event)
+		}
+	}
+	return selected
+}
+
+func assertCodexRefreshSequence(t *testing.T, events []codexHelperTraceEvent, want ...bool) {
+	t.Helper()
+	reads := codexTraceEventsByMethod(events, "account/read")
+	if len(reads) != len(want) {
+		t.Fatalf("account/read count = %d, want %d; trace=%+v", len(reads), len(want), events)
+	}
+	for index, expected := range want {
+		if reads[index].RefreshToken == nil {
+			t.Fatalf("account/read %d omitted refreshToken; trace=%+v", index+1, events)
+		}
+		if *reads[index].RefreshToken != expected {
+			t.Fatalf("account/read %d refreshToken = %t, want %t; trace=%+v",
+				index+1, *reads[index].RefreshToken, expected, events)
+		}
+		if reads[index].Generation != index+1 {
+			t.Fatalf("account/read %d generation = %d, want %d; trace=%+v",
+				index+1, reads[index].Generation, index+1, events)
+		}
+	}
+}
+
+func TestCodexCollectorUsesManagedTokenOnFirstAttempt(t *testing.T) {
+	c, tracePath := newTracedCodexCollector(t, "trace-normal")
+	report, err := c.Collect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.AuthState != "authenticated" || report.Windows.FiveHour == nil {
+		t.Fatalf("unexpected report: %+v", report)
+	}
+	events := readCodexHelperTrace(t, tracePath)
+	if starts := len(codexTraceEventsByMethod(events, "__start__")); starts != 1 {
+		t.Fatalf("app-server starts = %d, want 1; trace=%+v", starts, events)
+	}
+	assertCodexRefreshSequence(t, events, false)
+	if probes := len(codexTraceEventsByMethod(events, "account/rateLimits/read")); probes != 1 {
+		t.Fatalf("rate-limit probes = %d, want 1; trace=%+v", probes, events)
+	}
+}
+
+func TestCodexCollectorRefreshesAfterRateLimitAuthFailure(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		mode string
+	}{
+		{name: "explicit token_expired", mode: "rate-token-expired-once"},
+		{name: "structured HTTP 401", mode: "rate-structured-401-once"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			c, tracePath := newTracedCodexCollector(t, testCase.mode)
+			report, err := c.Collect(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.AuthState != "authenticated" || report.Windows.FiveHour == nil || report.Windows.SevenDay == nil {
+				t.Fatalf("unexpected recovered report: %+v", report)
+			}
+			events := readCodexHelperTrace(t, tracePath)
+			if starts := len(codexTraceEventsByMethod(events, "__start__")); starts != 2 {
+				t.Fatalf("app-server starts = %d, want 2; trace=%+v", starts, events)
+			}
+			assertCodexRefreshSequence(t, events, false, true)
+			if probes := len(codexTraceEventsByMethod(events, "account/rateLimits/read")); probes != 2 {
+				t.Fatalf("rate-limit probes = %d, want 2; trace=%+v", probes, events)
+			}
+		})
+	}
+}
+
+func TestCodexCollectorReturnsLoginRequiredWhenRefreshStillFails(t *testing.T) {
+	const sentinelSecret = "sentinel-refresh-secret-must-not-leak"
+	c, tracePath := newTracedCodexCollector(t, "refresh-auth-fails")
+	report, err := c.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect returned an error instead of a login-required report: %v", err)
+	}
+	if report.AuthState != "unauthenticated" || report.ErrorCode != "not_authenticated" ||
+		report.Windows.FiveHour != nil || report.Windows.SevenDay != nil {
+		t.Fatalf("unexpected login-required report: %+v", report)
+	}
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), sentinelSecret) || strings.Contains(fmt.Sprintf("%+v", report), sentinelSecret) {
+		t.Fatalf("provider report leaked the helper's sentinel secret: %s", encoded)
+	}
+	events := readCodexHelperTrace(t, tracePath)
+	if starts := len(codexTraceEventsByMethod(events, "__start__")); starts != 2 {
+		t.Fatalf("app-server starts = %d, want exactly 2; trace=%+v", starts, events)
+	}
+	assertCodexRefreshSequence(t, events, false, true)
+	if probes := len(codexTraceEventsByMethod(events, "account/rateLimits/read")); probes != 1 {
+		t.Fatalf("rate-limit probes = %d, want 1 because second account/read failed; trace=%+v", probes, events)
+	}
+}
+
+func TestCodexCollectorDoesNotRetryOrdinaryForbiddenError(t *testing.T) {
+	c, tracePath := newTracedCodexCollector(t, "rate-forbidden")
+	report, err := c.Collect(context.Background())
+	if err == nil {
+		t.Fatal("Collect unexpectedly recovered from an ordinary HTTP 403")
+	}
+	if report.ErrorCode != "rate_limits_read_failed" {
+		t.Fatalf("unexpected unavailable report: %+v", report)
+	}
+	events := readCodexHelperTrace(t, tracePath)
+	if starts := len(codexTraceEventsByMethod(events, "__start__")); starts != 1 {
+		t.Fatalf("app-server starts = %d, want 1; trace=%+v", starts, events)
+	}
+	assertCodexRefreshSequence(t, events, false)
+	if probes := len(codexTraceEventsByMethod(events, "account/rateLimits/read")); probes != 1 {
+		t.Fatalf("rate-limit probes = %d, want 1; trace=%+v", probes, events)
+	}
+}
+
+func TestCodexCollectorRefreshesAfterAccountReadTokenExpired(t *testing.T) {
+	c, tracePath := newTracedCodexCollector(t, "account-token-expired-once")
+	report, err := c.Collect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.AuthState != "authenticated" || report.Windows.FiveHour == nil || report.Windows.SevenDay == nil {
+		t.Fatalf("unexpected recovered report: %+v", report)
+	}
+	events := readCodexHelperTrace(t, tracePath)
+	if starts := len(codexTraceEventsByMethod(events, "__start__")); starts != 2 {
+		t.Fatalf("app-server starts = %d, want 2; trace=%+v", starts, events)
+	}
+	assertCodexRefreshSequence(t, events, false, true)
+	if probes := len(codexTraceEventsByMethod(events, "account/rateLimits/read")); probes != 1 {
+		t.Fatalf("rate-limit probes = %d, want 1; trace=%+v", probes, events)
+	}
+}
+
+func TestIsCodexRefreshableAuthError(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "message token_expired",
+			err:  &rpcError{Code: -32603, Message: "upstream token_expired"},
+			want: true,
+		},
+		{
+			name: "wrapped invalid_grant",
+			err:  fmt.Errorf("read account: %w", &rpcError{Code: -32603, Message: "invalid_grant"}),
+			want: true,
+		},
+		{
+			name: "structured nested code",
+			err:  &rpcError{Code: -32603, Message: "authentication failed", Data: json.RawMessage(`{"error":{"code":"refresh_token_expired"}}`)},
+			want: true,
+		},
+		{
+			name: "structured HTTP 401",
+			err:  &rpcError{Code: -32603, Message: "authentication failed", Data: json.RawMessage(`{"httpStatus":401}`)},
+			want: true,
+		},
+		{
+			name: "plain 401 text is not enough",
+			err:  &rpcError{Code: -32603, Message: "HTTP 401 Unauthorized"},
+			want: false,
+		},
+		{
+			name: "structured HTTP 403",
+			err:  &rpcError{Code: -32603, Message: "forbidden", Data: json.RawMessage(`{"httpStatus":403,"code":"forbidden"}`)},
+			want: false,
+		},
+		{
+			name: "malformed data",
+			err:  &rpcError{Code: -32603, Message: "authentication failed", Data: json.RawMessage(`{`)},
+			want: false,
+		},
+		{
+			name: "non RPC error",
+			err:  context.DeadlineExceeded,
+			want: false,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := isCodexRefreshableAuthError(testCase.err); got != testCase.want {
+				t.Fatalf("isCodexRefreshableAuthError(%v) = %t, want %t", testCase.err, got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestCodexCollectorReleaseIdleResourcesAllowsFreshProbe(t *testing.T) {
 	c := NewCodex(CodexConfig{
 		Command: os.Args[0], Args: []string{"-test.run=TestCodexHelperProcess", "--"},
@@ -251,6 +497,22 @@ func TestCodexHelperProcess(t *testing.T) {
 		time.Sleep(time.Hour)
 		return
 	}
+	generation := 0
+	if statePath := os.Getenv("CODEX_HELPER_STATE"); statePath != "" {
+		var err error
+		generation, err = advanceCodexHelperGeneration(statePath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		if err := appendCodexHelperTrace(codexHelperTraceEvent{
+			Generation: generation,
+			Method:     "__start__",
+		}); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+	}
 	disconnect := false
 	if mode == "disconnect-once" {
 		counter := os.Getenv("CODEX_HELPER_COUNTER")
@@ -263,12 +525,27 @@ func TestCodexHelperProcess(t *testing.T) {
 	encoder := json.NewEncoder(os.Stdout)
 	for scanner.Scan() {
 		var request struct {
-			ID     int64  `json:"id"`
-			Method string `json:"method"`
+			ID     int64           `json:"id"`
+			Method string          `json:"method"`
+			Params json.RawMessage `json:"params"`
 		}
 		_ = json.Unmarshal(scanner.Bytes(), &request)
 		if request.ID == 0 {
 			continue
+		}
+		event := codexHelperTraceEvent{Generation: generation, Method: request.Method}
+		if request.Method == "account/read" {
+			var params struct {
+				RefreshToken *bool `json:"refreshToken"`
+			}
+			_ = json.Unmarshal(request.Params, &params)
+			event.RefreshToken = params.RefreshToken
+		}
+		if generation != 0 {
+			if err := appendCodexHelperTrace(event); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(2)
+			}
 		}
 		if disconnect && request.Method == "account/read" {
 			return
@@ -281,6 +558,20 @@ func TestCodexHelperProcess(t *testing.T) {
 		var result any = map[string]any{}
 		switch request.Method {
 		case "account/read":
+			if mode == "account-token-expired-once" && generation == 1 {
+				writeCodexHelperRPCError(encoder, request.ID, "account token_expired", map[string]any{
+					"code": "token_expired",
+				})
+				continue
+			}
+			if mode == "refresh-auth-fails" && generation == 2 {
+				const sentinelSecret = "sentinel-refresh-secret-must-not-leak"
+				writeCodexHelperRPCError(encoder, request.ID, "refresh failed: "+sentinelSecret, map[string]any{
+					"code":       "invalid_grant",
+					"diagnostic": sentinelSecret,
+				})
+				continue
+			}
 			if mode == "unauthenticated" {
 				result = map[string]any{"requiresOpenaiAuth": true, "account": nil}
 			} else {
@@ -290,6 +581,25 @@ func TestCodexHelperProcess(t *testing.T) {
 			if mode == "unauthenticated" {
 				return
 			}
+			if (mode == "rate-token-expired-once" || mode == "refresh-auth-fails") && generation == 1 {
+				writeCodexHelperRPCError(encoder, request.ID, "rate limit token_expired", map[string]any{
+					"code": "token_expired",
+				})
+				continue
+			}
+			if mode == "rate-structured-401-once" && generation == 1 {
+				writeCodexHelperRPCError(encoder, request.ID, "rate-limit authentication rejected", map[string]any{
+					"httpStatus": 401,
+				})
+				continue
+			}
+			if mode == "rate-forbidden" {
+				writeCodexHelperRPCError(encoder, request.ID, "rate-limit request forbidden", map[string]any{
+					"httpStatus": 403,
+					"code":       "forbidden",
+				})
+				continue
+			}
 			result = map[string]any{"rateLimits": map[string]any{
 				"planType":  "pro",
 				"primary":   map[string]any{"usedPercent": 10, "windowDurationMins": 300, "resetsAt": 1786320000},
@@ -298,6 +608,60 @@ func TestCodexHelperProcess(t *testing.T) {
 		}
 		_ = encoder.Encode(map[string]any{"id": request.ID, "result": result})
 	}
+}
+
+func advanceCodexHelperGeneration(path string) (int, error) {
+	generation := 0
+	payload, err := os.ReadFile(path)
+	if err == nil {
+		generation, err = strconv.Atoi(strings.TrimSpace(string(payload)))
+		if err != nil {
+			return 0, fmt.Errorf("decode Codex helper generation: %w", err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return 0, fmt.Errorf("read Codex helper generation: %w", err)
+	}
+	generation++
+	if err := os.WriteFile(path, []byte(strconv.Itoa(generation)), 0o600); err != nil {
+		return 0, fmt.Errorf("write Codex helper generation: %w", err)
+	}
+	return generation, nil
+}
+
+func appendCodexHelperTrace(event codexHelperTraceEvent) error {
+	path := os.Getenv("CODEX_HELPER_TRACE")
+	if path == "" {
+		return nil
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("encode Codex helper trace: %w", err)
+	}
+	payload = append(payload, '\n')
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return fmt.Errorf("open Codex helper trace: %w", err)
+	}
+	_, writeErr := file.Write(payload)
+	closeErr := file.Close()
+	if writeErr != nil {
+		return fmt.Errorf("write Codex helper trace: %w", writeErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close Codex helper trace: %w", closeErr)
+	}
+	return nil
+}
+
+func writeCodexHelperRPCError(encoder *json.Encoder, id int64, message string, data any) {
+	_ = encoder.Encode(map[string]any{
+		"id": id,
+		"error": map[string]any{
+			"code":    -32603,
+			"message": message,
+			"data":    data,
+		},
+	})
 }
 
 func TestRPCErrorString(t *testing.T) {

@@ -40,12 +40,13 @@ type CodexConfig struct {
 type CodexCollector struct {
 	cfg CodexConfig
 
-	startMu sync.Mutex
-	writeMu sync.Mutex
-	mu      sync.Mutex
-	proc    *codexProcess
-	pending map[int64]chan rpcResponse
-	nextID  atomic.Int64
+	collectMu sync.Mutex
+	startMu   sync.Mutex
+	writeMu   sync.Mutex
+	mu        sync.Mutex
+	proc      *codexProcess
+	pending   map[int64]chan rpcResponse
+	nextID    atomic.Int64
 }
 
 type codexProcess struct {
@@ -98,38 +99,135 @@ func NewCodex(cfg CodexConfig) *CodexCollector {
 	return &CodexCollector{cfg: cfg, pending: make(map[int64]chan rpcResponse)}
 }
 
-// Collect queries both account/read and account/rateLimits/read. The method is
-// safe for concurrent callers, although the underlying requests are serialized
-// by the JSONL writer.
+// Collect queries both account/read and account/rateLimits/read. Collections
+// are serialized so an expired access token can be refreshed without two
+// callers racing to rotate the same provider-owned refresh token.
 func (c *CodexCollector) Collect(ctx context.Context) (model.ProviderReport, error) {
+	c.collectMu.Lock()
+	defer c.collectMu.Unlock()
+
+	report, err := c.collectAttempt(ctx, false)
+	if err == nil {
+		return report, nil
+	}
+
+	refreshable := isCodexRefreshableAuthError(err)
+	if resetErr := c.resetCurrentProcessAndWait(ctx); resetErr != nil {
+		return report, resetErr
+	}
+	if !refreshable {
+		return report, err
+	}
+
+	// account/read normally lets the Codex CLI manage its own token lifecycle.
+	// Force a refresh only after app-server has explicitly rejected the access
+	// token, then retry the complete account + rate-limit transaction once.
+	report, err = c.collectAttempt(ctx, true)
+	if err == nil {
+		return report, nil
+	}
+	retryWasAuthFailure := isCodexRefreshableAuthError(err)
+	if resetErr := c.resetCurrentProcessAndWait(ctx); resetErr != nil {
+		return report, resetErr
+	}
+	if retryWasAuthFailure {
+		// Do not retain old quota values indefinitely when the refresh token can
+		// no longer recover the account. A nil error lets the agent publish the
+		// login-required state instead of preserving the stale snapshot.
+		return codexLoginRequiredReport(), nil
+	}
+	return report, err
+}
+
+func (c *CodexCollector) collectAttempt(ctx context.Context, refreshToken bool) (model.ProviderReport, error) {
 	if err := c.ensureStarted(ctx); err != nil {
 		return unavailableReport(model.ProviderCodex, "codex-app-server", "start_failed"), err
 	}
 
 	var account accountResponse
-	if err := c.call(ctx, "account/read", map[string]any{"refreshToken": false}, &account); err != nil {
-		c.resetCurrentProcess()
+	if err := c.call(ctx, "account/read", map[string]any{"refreshToken": refreshToken}, &account); err != nil {
 		return unavailableReport(model.ProviderCodex, "codex-app-server", "account_read_failed"), err
 	}
 	if account.Account == nil && account.RequiresOpenAIAuth {
 		// A separately invoked `codex login --device-auth` updates the provider's
 		// credential store. Recreate app-server on the next poll so it cannot keep
 		// an unauthenticated in-memory session after that external login succeeds.
-		c.resetCurrentProcess()
-		return model.ProviderReport{
-			ObservedAt: time.Now().UTC(),
-			AuthState:  "unauthenticated",
-			Source:     "codex-app-server",
-			Windows:    model.ProviderWindows{},
-			ErrorCode:  "not_authenticated",
-		}, nil
+		if err := c.resetCurrentProcessAndWait(ctx); err != nil {
+			return unavailableReport(model.ProviderCodex, "codex-app-server", "account_read_failed"), err
+		}
+		return codexLoginRequiredReport(), nil
 	}
 	var limits rateLimitsResponse
 	if err := c.call(ctx, "account/rateLimits/read", nil, &limits); err != nil {
-		c.resetCurrentProcess()
 		return unavailableReport(model.ProviderCodex, "codex-app-server", "rate_limits_read_failed"), err
 	}
 	return normalizeCodex(account, limits, time.Now()), nil
+}
+
+func codexLoginRequiredReport() model.ProviderReport {
+	return model.ProviderReport{
+		ObservedAt: time.Now().UTC(),
+		AuthState:  "unauthenticated",
+		Source:     "codex-app-server",
+		Windows:    model.ProviderWindows{},
+		ErrorCode:  "not_authenticated",
+	}
+}
+
+func isCodexRefreshableAuthError(err error) bool {
+	var appErr *rpcError
+	if !errors.As(err, &appErr) {
+		return false
+	}
+
+	message := strings.ToLower(appErr.Message)
+	if strings.Contains(message, "token_expired") ||
+		strings.Contains(message, "invalid_grant") ||
+		strings.Contains(message, "refresh token is expired") ||
+		(strings.Contains(message, "401 unauthorized") && strings.Contains(message, "expired")) {
+		return true
+	}
+
+	var data any
+	if len(appErr.Data) == 0 || json.Unmarshal(appErr.Data, &data) != nil {
+		return false
+	}
+	return codexAuthErrorDataIsRefreshable(data)
+}
+
+func codexAuthErrorDataIsRefreshable(value any) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			compactKey := strings.ToLower(strings.ReplaceAll(key, "_", ""))
+			switch compactKey {
+			case "code", "errorcode", "type":
+				if text, ok := child.(string); ok {
+					switch strings.ToLower(strings.TrimSpace(text)) {
+					case "token_expired", "refresh_token_expired", "invalid_token", "invalid_grant":
+						return true
+					}
+				}
+			case "httpstatus", "status", "statuscode":
+				if number, ok := child.(float64); ok && number == 401 {
+					return true
+				}
+			}
+			if codexAuthErrorDataIsRefreshable(child) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if codexAuthErrorDataIsRefreshable(child) {
+				return true
+			}
+		}
+	case string:
+		text := strings.ToLower(typed)
+		return strings.Contains(text, "token_expired") || strings.Contains(text, "invalid_grant")
+	}
+	return false
 }
 
 func (c *CodexCollector) ensureStarted(ctx context.Context) error {
@@ -344,12 +442,19 @@ func (c *CodexCollector) ReleaseIdleResources() {
 	<-p.exited
 }
 
-func (c *CodexCollector) resetCurrentProcess() {
+func (c *CodexCollector) resetCurrentProcessAndWait(ctx context.Context) error {
 	c.mu.Lock()
 	p := c.proc
 	c.mu.Unlock()
-	if p != nil {
-		c.stopProcess(p, errors.New("recreate codex app-server"))
+	if p == nil {
+		return nil
+	}
+	c.stopProcess(p, errors.New("recreate codex app-server"))
+	select {
+	case <-p.exited:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("wait for codex app-server exit: %w", ctx.Err())
 	}
 }
 
