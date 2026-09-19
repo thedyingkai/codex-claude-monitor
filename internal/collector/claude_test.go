@@ -253,17 +253,104 @@ func (r *fakeRunner) Run(_ context.Context, _ string, args []string, env []strin
 	return r.outputs[index], r.errors[index]
 }
 
-func TestClaudeCollectorParsesUnauthenticatedStdoutDespiteExitOne(t *testing.T) {
-	runner := &fakeRunner{outputs: [][]byte{[]byte(`{"loggedIn":false,"authMethod":"none"}`)}, errors: []error{errors.New("exit status 1")}}
-	report, err := NewClaude(ClaudeConfig{Runner: runner}).Collect(context.Background())
+func TestClaudeCollectorConfirmsUnauthenticatedStdoutDespiteExitOne(t *testing.T) {
+	runner := &fakeRunner{
+		outputs: [][]byte{
+			[]byte(`{"loggedIn":false,"authMethod":"none"}`),
+			[]byte(`{"loggedIn":false,"authMethod":"none"}`),
+		},
+		errors: []error{errors.New("exit status 1"), errors.New("exit status 1")},
+	}
+	collector := NewClaude(ClaudeConfig{Runner: runner})
+
+	first, err := collector.Collect(context.Background())
+	if !errors.Is(err, errClaudeLogoutUnconfirmed) {
+		t.Fatalf("first logout observation error = %v, want confirmation error", err)
+	}
+	if first.AuthState != "unknown" || first.ErrorCode != "auth_logout_unconfirmed" {
+		t.Fatalf("first logout observation became authoritative: %+v", first)
+	}
+
+	report, err := collector.Collect(context.Background())
 	if err != nil {
-		t.Fatalf("valid auth stdout must win over exit status: %v", err)
+		t.Fatalf("second explicit logout must be authoritative: %v", err)
 	}
 	if report.AuthState != "unauthenticated" || report.ErrorCode != "not_authenticated" {
-		t.Fatalf("unexpected report: %+v", report)
+		t.Fatalf("unexpected confirmed logout report: %+v", report)
 	}
-	if len(runner.calls) != 1 {
+	if len(runner.calls) != 2 {
 		t.Fatalf("usage should not run while logged out: %d calls", len(runner.calls))
+	}
+}
+
+func TestParseClaudeAuthStatusRejectsAmbiguousJSON(t *testing.T) {
+	for name, payload := range map[string]string{
+		"empty object":       `{}`,
+		"null":               `null`,
+		"error envelope":     `{"error":"temporary failure"}`,
+		"null login state":   `{"loggedIn":null}`,
+		"string login state": `{"loggedIn":"true"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if report, err := ParseClaudeAuthStatus([]byte(payload)); err == nil {
+				t.Fatalf("ambiguous auth payload became a report: %+v", report)
+			}
+		})
+	}
+}
+
+func TestClaudeCollectorAuthenticatedResultResetsLogoutConfirmation(t *testing.T) {
+	runner := &fakeRunner{
+		outputs: [][]byte{
+			[]byte(`{"loggedIn":false,"authMethod":"none"}`),
+			[]byte(`{"loggedIn":true,"subscriptionType":"pro"}`),
+			[]byte(`{"rate_limits":{"five_hour":{"used_percentage":1,"resets_at":"2026-09-20T00:00:00Z"}}}`),
+			[]byte(`{"loggedIn":false,"authMethod":"none"}`),
+		},
+		errors: []error{errors.New("exit status 1"), nil, nil, errors.New("exit status 1")},
+	}
+	collector := NewClaude(ClaudeConfig{Runner: runner})
+
+	if _, err := collector.Collect(context.Background()); !errors.Is(err, errClaudeLogoutUnconfirmed) {
+		t.Fatalf("first logout observation error = %v", err)
+	}
+	recovered, err := collector.Collect(context.Background())
+	if err != nil || recovered.AuthState != "authenticated" || recovered.Windows.FiveHour == nil {
+		t.Fatalf("authenticated recovery failed: report=%+v err=%v", recovered, err)
+	}
+	afterRecovery, err := collector.Collect(context.Background())
+	if !errors.Is(err, errClaudeLogoutUnconfirmed) {
+		t.Fatalf("logout counter was not reset: report=%+v err=%v", afterRecovery, err)
+	}
+	if afterRecovery.AuthState != "unknown" || afterRecovery.ErrorCode != "auth_logout_unconfirmed" {
+		t.Fatalf("post-recovery single logout became authoritative: %+v", afterRecovery)
+	}
+}
+
+func TestClaudeCollectorInvalidAuthPayloadBreaksLogoutConfirmation(t *testing.T) {
+	runner := &fakeRunner{
+		outputs: [][]byte{
+			[]byte(`{"loggedIn":false,"authMethod":"none"}`),
+			[]byte(`{"error":"temporary credential-store failure"}`),
+			[]byte(`{"loggedIn":false,"authMethod":"none"}`),
+		},
+		errors: []error{errors.New("exit status 1"), nil, errors.New("exit status 1")},
+	}
+	collector := NewClaude(ClaudeConfig{Runner: runner})
+
+	if _, err := collector.Collect(context.Background()); !errors.Is(err, errClaudeLogoutUnconfirmed) {
+		t.Fatalf("first logout observation error = %v", err)
+	}
+	invalid, err := collector.Collect(context.Background())
+	if err == nil || invalid.ErrorCode != "auth_status_invalid" {
+		t.Fatalf("invalid auth payload was not rejected: report=%+v err=%v", invalid, err)
+	}
+	afterInvalid, err := collector.Collect(context.Background())
+	if !errors.Is(err, errClaudeLogoutUnconfirmed) {
+		t.Fatalf("invalid payload did not reset confirmation: report=%+v err=%v", afterInvalid, err)
+	}
+	if afterInvalid.AuthState != "unknown" || afterInvalid.ErrorCode != "auth_logout_unconfirmed" {
+		t.Fatalf("post-invalid single logout became authoritative: %+v", afterInvalid)
 	}
 }
 
