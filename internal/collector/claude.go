@@ -11,12 +11,17 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"codex-claude-monitor/internal/model"
 )
 
 const ProbeEnvironment = "QUOTA_MONITOR_PROBE=1"
+
+const claudeLogoutConfirmations = 2
+
+var errClaudeLogoutUnconfirmed = errors.New("claude logout is awaiting confirmation")
 
 // CommandRunner makes provider command execution fixture-testable without
 // putting shell parsing in the collector.
@@ -49,6 +54,9 @@ type ClaudeConfig struct {
 
 type ClaudeCollector struct {
 	cfg ClaudeConfig
+
+	authMu               sync.Mutex
+	consecutiveLoggedOut int
 }
 
 func NewClaude(cfg ClaudeConfig) *ClaudeCollector {
@@ -73,15 +81,20 @@ func (c *ClaudeCollector) Collect(ctx context.Context) (model.ProviderReport, er
 	authOutput, err := c.cfg.Runner.Run(requestCtx, c.cfg.Command, []string{"auth", "status", "--json"}, []string{"NO_COLOR=1", ProbeEnvironment})
 	auth, parseErr := ParseClaudeAuthStatus(authOutput)
 	if parseErr != nil {
+		c.resetLogoutConfirmation()
 		if err != nil {
 			return unavailableReport(model.ProviderClaude, "claude-auth-status", "auth_status_failed"), err
 		}
 		return unavailableReport(model.ProviderClaude, "claude-auth-status", "auth_status_invalid"), parseErr
 	}
 	if auth.AuthState != "authenticated" {
+		if !c.confirmLoggedOut() {
+			return unavailableReport(model.ProviderClaude, "claude-auth-status", "auth_logout_unconfirmed"), errClaudeLogoutUnconfirmed
+		}
 		auth.ErrorCode = "not_authenticated"
 		return auth, nil
 	}
+	c.resetLogoutConfirmation()
 	if err != nil {
 		return unavailableReport(model.ProviderClaude, "claude-auth-status", "auth_status_failed"), err
 	}
@@ -110,6 +123,19 @@ func (c *ClaudeCollector) Collect(ctx context.Context) (model.ProviderReport, er
 }
 
 func (c *ClaudeCollector) Close() error { return nil }
+
+func (c *ClaudeCollector) confirmLoggedOut() bool {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
+	c.consecutiveLoggedOut++
+	return c.consecutiveLoggedOut >= claudeLogoutConfirmations
+}
+
+func (c *ClaudeCollector) resetLogoutConfirmation() {
+	c.authMu.Lock()
+	c.consecutiveLoggedOut = 0
+	c.authMu.Unlock()
+}
 
 func CollectClaudeAuth(ctx context.Context, runner CommandRunner, command string, timeout time.Duration) (model.ProviderReport, error) {
 	collector := NewClaude(ClaudeConfig{Command: command, Runner: runner, Timeout: timeout})
@@ -152,7 +178,13 @@ func ParseClaudeAuthStatus(payload []byte) (model.ProviderReport, error) {
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		return model.ProviderReport{}, fmt.Errorf("decode claude auth status: %w", err)
 	}
-	loggedIn, _ := boolValue(raw, "loggedIn", "logged_in", "authenticated")
+	if raw == nil {
+		return model.ProviderReport{}, errors.New("decode claude auth status: expected a JSON object")
+	}
+	loggedIn, ok := boolValue(raw, "loggedIn", "logged_in", "authenticated")
+	if !ok {
+		return model.ProviderReport{}, errors.New("decode claude auth status: missing boolean login state")
+	}
 	plan, _ := stringValue(raw, "subscriptionType", "subscription_type", "plan", "planType")
 	if plan == "" {
 		plan, _ = stringValueNested(raw, []string{"account", "subscriptionType"}, []string{"account", "plan"})
